@@ -165,6 +165,10 @@ const ALIAS={"茅台":"600519","宁德":"300750","宁德时代":"300750","比亚
 let state={code:"600519",model:"hy3",data:null};
 let klineChart,chipChart;
 
+// 发布链接带 ?sharecode=，需透传给 API 以通过代理鉴权
+const SHARE = new URLSearchParams(location.search).get('sharecode');
+function withShare(url){ return SHARE ? url + (url.includes('?')?'&':'?') + 'sharecode=' + encodeURIComponent(SHARE) : url; }
+
 /* ===== 客户端计算（兜底/图表用） ===== */
 function computeCYQ(klines,price){
   const arr=[...klines]; let minL=Infinity,maxH=-Infinity;
@@ -202,7 +206,7 @@ async function load(code){
   document.getElementById("main").classList.add("hidden");
   document.getElementById("err").classList.add("hidden");
   try{
-    const r=await fetch('/api/analyze?code='+encodeURIComponent(code));
+    const r=await fetch(withShare('/api/analyze?code='+encodeURIComponent(code)));
     const j=await r.json();
     if(!j.ok) throw new Error(j.msg||'数据获取失败');
     state.data=j; render();
@@ -220,7 +224,7 @@ async function doSearch(){
   const key=ALIAS[q]; if(key){ load(key); return; }
   // 在线搜索
   try{
-    const r=await fetch('/api/search?q='+encodeURIComponent(q)); const j=await r.json();
+    const r=await fetch(withShare('/api/search?q='+encodeURIComponent(q))); const j=await r.json();
     if(j.list&&j.list.length){ load(j.list[0].code); return; }
   }catch(e){}
   alert("未找到该股票。示例：600519 / 300750 / 002594 / 300059；或试试 茅台、宁德、比亚迪。");

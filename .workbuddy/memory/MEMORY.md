@@ -16,8 +16,13 @@
 - 原型已构建并推送到 GitHub：https://github.com/dametime1110/stock-short-elf （含 index.html 前端 + api/analyze.js 后端 + vercel.json + README）。
 - 4 只样本股用 iFinD 真实数据 + AI 双模型(hy3/step5)短评已内嵌。
 
-## 待确认（部署前）
-1. 部署平台（Vercel vs Cloudflare）
-2. ~~iFinD REST/SDK 凭证~~ → 已改为东财免费接口，无需此凭证
-3. ~~hy3/step5 API 接入~~ → 用户无 LLM API key 且不熟悉技术概念；live 短评优先走「Agent 对话生成」，部署版 App 先以「实时数据 + 样本短评」形态交付，待用户日后有 key 再接通自治短评。
-4. 部署后 env（仅自治模式需要）：HY3_BASE_URL/KEY、STEP5_BASE_URL/KEY、ACTIVE_MODEL（无需 IFIND_TOKEN）
+## 当前状态（2026-10-19 已部署）
+- **公网链接（手机/电脑通用）**：https://stock-short-elf.app.workbuddy.host/?sharecode=3MXZOXM2SW
+- 数据已**全市场实时**：腾讯财经(主)+东财(兜底) 取 K线/行情/估值(PE·PB·市值)；东财取 主力资金流/公告；筹码峰自算 CYQ。已验证线上返回真实数据（茅台/五粮液等）。
+- 4 只示例股（茅台/宁德/比亚迪/东财）含 AI 范例短评（hy3+step5 双版）；其余股票走规则速评；hy3/step5 可切换展示。
+- 部署方式：发布为应用（Node 服务 server.js，监听 PORT），无需用户注册账号。GitHub 仓库同步：https://github.com/dametime1110/stock-short-elf
+- 前端 fetch 需透传链接里的 `?sharecode=` 才能通过代理鉴权（已修复）。
+
+## 下一步（可选）
+1. 用户想要"全市场 + 真·AI 短评"自治：需提供大模型 API key（HY3/STEP5 的 base_url+key+model），接通 analyzer 的 LLM 分支。
+2. 主力资金流接口（东财 push2）在部分沙箱环境被限流时优雅降级为"暂不可用"；线上一般可用。
