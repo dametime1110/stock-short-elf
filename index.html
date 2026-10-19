@@ -237,7 +237,7 @@ const ALIAS={"茅台":"600519","宁德":"300750","宁德时代":"300750","比亚
 const SHARE = new URLSearchParams(location.search).get('sharecode');
 function withShare(url){ return SHARE ? url + (url.includes('?')?'&':'?') + 'sharecode=' + encodeURIComponent(SHARE) : url; }
 
-let state={ tab:'stock', model:'hy3', code:'600519', data:null,
+let state={ tab:'stock', model:'hy3', code:'600519', data:null, nextRefreshAt:Date.now()+30000,
   watch: loadWatch(), market:{mode:'up',list:[],breadth:null,updatedAt:0,loading:false} };
 let klineChart,chipChart;
 
@@ -288,6 +288,7 @@ function switchTab(tab){
   if(tab==='watch') refreshWatch();
   if(tab==='market') refreshMarket();
   if(tab==='stock' && !state.data) load(state.code);
+  state.nextRefreshAt=Date.now()+30000;
   updateStatus();
 }
 
@@ -392,13 +393,14 @@ function updateStatus(){
   const dot=document.querySelector('#status .dot');
   const trading=isTrading();
   dot.className='dot '+(trading?'on':'off');
-  let txt = trading ? '● 实时监测中（交易时段，每30秒自动刷新）' : '○ 非交易时段（数据为最近可用行情，开盘后自动监测）';
+  const base = trading ? '● 实时监测中' : '○ 非交易时段（显示最近收盘数据）';
   let lag='';
   if(state.tab==='market' && state.market.updatedAt){ lag=' · 数据延迟 '+Math.max(0,Math.round((Date.now()-state.market.updatedAt)/1000))+'s'; }
-  if(state.tab==='watch'){ lag=' · 已自动刷新'; }
-  document.getElementById('status').innerHTML='<span class="dot '+(trading?'on':'off')+'></span>'+txt+lag;
+  const remain=Math.max(0,Math.ceil((state.nextRefreshAt-Date.now())/1000));
+  document.getElementById('status').innerHTML='<span class="dot '+(trading?'on':'off')+'"></span>'+base+' · 每30秒自动刷新 · 下次刷新 '+remain+'s'+lag;
 }
 async function manualRefresh(){
+  state.nextRefreshAt=Date.now()+30000;
   if(state.tab==='watch') await refreshWatch();
   else if(state.tab==='market') await refreshMarket();
   else if(state.data) await refreshDetailPrice();
@@ -510,7 +512,16 @@ function copyToAI(){
 /* ===== 初始化 ===== */
 buildChips();
 switchTab('stock'); load('600519');
-setInterval(()=>{ if(isTrading()){ if(state.tab==='watch') refreshWatch(); else if(state.tab==='market') refreshMarket(); else if(state.data) refreshDetailPrice(); updateStatus(); } }, 30000);
+// 全天候自动刷新：每30秒一次（收盘后也刷新，保证任何时间打开都是最新数据；云端运行，无需开电脑）
+state.nextRefreshAt=Date.now()+30000;
+setInterval(()=>{ updateStatus(); },1000); // 倒计时每秒更新
+setInterval(()=>{
+  state.nextRefreshAt=Date.now()+30000;
+  if(state.tab==='watch') refreshWatch();
+  else if(state.tab==='market') refreshMarket();
+  else if(state.data) refreshDetailPrice();
+  updateStatus();
+},30000);
 window.addEventListener("resize",()=>{if(klineChart)klineChart.resize();if(chipChart)chipChart.resize();});
 </script>
 </body>
