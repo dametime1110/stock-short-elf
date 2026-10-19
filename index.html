@@ -25,6 +25,14 @@
   .search{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .search input{flex:1;min-width:160px;background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:14px;outline:none}
   .search button{background:var(--brand);border:0;color:#fff;border-radius:10px;padding:0 18px;font-size:14px;font-weight:700;cursor:pointer}
+  .sres{display:none;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:12px;font-size:13px}
+  .sres.show{display:block}
+  .sres .st{color:var(--sub);font-size:12px;padding:2px 4px 6px}
+  .sres .it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .sres .it:hover{background:var(--card)}
+  .sres .it .nm{color:var(--ink);font-weight:600}
+  .sres .it .cd{color:var(--sub);font-size:12px;font-family:monospace}
+  .sres .err{color:#f87171;padding:6px 4px}
   .statusbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--sub);flex-wrap:wrap}
   .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
   .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
@@ -113,6 +121,7 @@
     <input id="inp" placeholder="输入6位代码或名称，如 600519 / 宁德时代" onkeydown="if(event.key==='Enter')doSearch()">
     <button onclick="doSearch()">查询</button>
   </div>
+  <div class="sres" id="sres"></div>
 
   <div class="statusbar">
     <span id="status"><span class="dot off"></span>监测状态加载中…</span>
@@ -237,7 +246,7 @@ const ALIAS={"茅台":"600519","宁德":"300750","宁德时代":"300750","比亚
 const SHARE = new URLSearchParams(location.search).get('sharecode');
 function withShare(url){ return SHARE ? url + (url.includes('?')?'&':'?') + 'sharecode=' + encodeURIComponent(SHARE) : url; }
 
-let state={ tab:'stock', model:'hy3', code:'600519', data:null, nextRefreshAt:Date.now()+30000,
+let state={ tab:'stock', model:'hy3', code:'600519', data:null, nextRefreshAt:Date.now()+30000, loading:false,
   watch: loadWatch(), market:{mode:'up',list:[],breadth:null,updatedAt:0,loading:false} };
 let klineChart,chipChart;
 
@@ -287,15 +296,18 @@ function switchTab(tab){
   });
   if(tab==='watch') refreshWatch();
   if(tab==='market') refreshMarket();
-  if(tab==='stock' && !state.data) load(state.code);
+  // 防重入：load() 内部会调 switchTab()，若无标志会无限递归爆栈
+  // （表现为：页面初始加载/首次搜索点击无反应）
+  if(tab==='stock' && !state.data && !state.loading) load(state.code);
   state.nextRefreshAt=Date.now()+30000;
   updateStatus();
 }
 
 /* ===== 个股加载 ===== */
 async function load(code){
-  state.code=code; state.tab='stock';
+  state.code=code; state.tab='stock'; state.loading=true;
   switchTab('stock');
+  hideSres();
   document.getElementById("loading").classList.remove("hidden");
   document.getElementById("main").classList.add("hidden");
   document.getElementById("err").classList.add("hidden");
@@ -308,20 +320,39 @@ async function load(code){
     if(FALLBACK_DATA[code]){ state.data={...FALLBACK_DATA[code],_fallback:true}; render(); }
     else { document.getElementById("loading").classList.add("hidden");
       document.getElementById("err").classList.remove("hidden");
-      document.getElementById("err").textContent="加载失败："+e.message; }
-  }
+      document.getElementById("err").textContent="加载失败："+e.message+"（可稍后重试，或输入其他股票代码）"; }
+  }finally{ state.loading=false; }
 }
+function showSres(html){ const el=document.getElementById("sres"); el.innerHTML=html; el.classList.add("show"); }
+function hideSres(){ document.getElementById("sres").classList.remove("show"); }
+
 async function doSearch(){
   const q=document.getElementById("inp").value.trim();
   if(!q) return;
+  hideSres();
   if(/^\d{6}$/.test(q)){ load(q); return; }
   const key=ALIAS[q]; if(key){ load(key); return; }
+  // 查询中状态（避免用户以为没反应而重复点击）
+  showSres('<div class="st">🔍 正在搜索 "'+escHtml(q)+'" …</div>');
   try{
-    const r=await fetch(withShare('/api/search?q='+encodeURIComponent(q))); const j=await r.json();
-    if(j.list&&j.list.length){ load(j.list[0].code); return; }
-  }catch(e){}
-  alert("未找到该股票。示例：600519 / 300750 / 002594 / 300059；或试试 茅台、宁德、比亚迪。");
+    const r=await fetch(withShare('/api/search?q='+encodeURIComponent(q)));
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    const list=(j.list||[]).slice(0,8);
+    if(list.length===1){ load(list[0].code); return; }
+    if(list.length>1){
+      showSres('<div class="st">找到 '+list.length+' 只，点击选择：</div>'+list.map(x=>
+        '<div class="it" onclick="load(\''+x.code+'\');hideSres()"><span class="nm">'+escHtml(x.name)+'</span><span class="cd">'+x.code+'</span></div>'
+      ).join(''));
+      return;
+    }
+    // 没找到：给出可操作的提示（只支持A股；给出替代建议）
+    showSres('<div class="err">未找到 "'+escHtml(q)+'"。本工具仅支持 <b>A股</b>（6位代码），暂不支持港股/美股/指数。<br>试试：直接输6位代码（如 600519），或换全称/简称（如 茅台、招行、宁德）。</div>');
+  }catch(e){
+    showSres('<div class="err">搜索服务网络抖动（'+escHtml(String(e.message||e))+'），请稍等几秒再试一次；或直接输入6位股票代码查询。</div>');
+  }
 }
+function escHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function setModel(m){
   state.model=m;
   document.getElementById("btnHy3").className=m==="hy3"?"on":"";
