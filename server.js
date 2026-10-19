@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { analyze, search } = require('./lib/analyzer');
+const { analyze, search, getLiveQuotes, getMarketView, refreshStockList } = require('./lib/analyzer');
 
 const PORT = process.env.PORT || 3000;
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
@@ -35,6 +35,33 @@ const server = http.createServer(async (req, res) => {
       sendJSON(200, { ok: true, list });
     } catch (e) {
       sendJSON(200, { ok: true, list: [] });
+    }
+    return;
+  }
+
+  if (u.pathname === '/api/quotes') {
+    const raw = u.searchParams.get('codes') || '';
+    const codes = [...new Set(raw.split(',').map(s => s.trim().replace(/\D/g, '')).filter(c => c.length === 6))];
+    if (!codes.length) return sendJSON(400, { ok: false, msg: '缺少有效的 codes' });
+    try {
+      const { source, map } = await getLiveQuotes(codes);
+      const list = codes.map(c => map[c]).filter(Boolean);
+      sendJSON(200, { ok: true, source, updatedAt: Date.now(), list });
+    } catch (e) {
+      sendJSON(502, { ok: false, msg: String(e.message || e) });
+    }
+    return;
+  }
+
+  if (u.pathname === '/api/market') {
+    const mode = u.searchParams.get('mode') || 'up';
+    const limit = Math.min(parseInt(u.searchParams.get('limit') || '30', 10) || 30, 100);
+    const force = u.searchParams.get('force') === '1';
+    try {
+      const data = await getMarketView(mode, limit, force);
+      sendJSON(200, data);
+    } catch (e) {
+      sendJSON(502, { ok: false, msg: String(e.message || e) });
     }
     return;
   }

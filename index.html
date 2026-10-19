@@ -13,15 +13,23 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
   .app{max-width:1080px;margin:0 auto;padding:14px 14px 80px}
-  header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:6px 2px 12px}
+  header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:6px 2px 8px}
   .logo{font-size:19px;font-weight:800;letter-spacing:.5px}
   .logo b{color:var(--brand)}
   .toggle{display:flex;background:var(--card2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .toggle button{background:transparent;border:0;color:var(--sub);padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
   .toggle button.on{background:var(--brand);color:#fff}
-  .search{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .nav{display:flex;gap:8px;margin:0 0 12px}
+  .nav button{flex:1;background:var(--card);border:1px solid var(--line);color:var(--sub);border-radius:10px;padding:11px 8px;font-size:14px;font-weight:700;cursor:pointer}
+  .nav button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .search{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   .search input{flex:1;min-width:160px;background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:14px;outline:none}
   .search button{background:var(--brand);border:0;color:#fff;border-radius:10px;padding:0 18px;font-size:14px;font-weight:700;cursor:pointer}
+  .statusbar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:var(--sub);flex-wrap:wrap}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.off{background:#64748b}
+  .statusbar button{background:transparent;border:1px solid var(--line);color:var(--sub);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
   .chip{background:var(--card);border:1px solid var(--line);color:var(--sub);border-radius:999px;padding:6px 13px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
@@ -63,6 +71,26 @@
   .loading{padding:40px;text-align:center;color:var(--sub)}
   .err{padding:30px;text-align:center;color:#ff8a8a}
   .hidden{display:none}
+  /* 表格（自选/全市场） */
+  table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.tbl th{text-align:right;color:var(--sub);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
+  table.tbl th:first-child,table.tbl td:first-child{text-align:left}
+  table.tbl td{text-align:right;padding:9px 10px;border-bottom:1px solid #1d2638;cursor:pointer}
+  table.tbl tr:hover td{background:#1d2638}
+  .code{color:var(--sub);font-size:12px}
+  .addbar{display:flex;gap:8px;margin-bottom:12px}
+  .addbar input{flex:1;background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:14px;outline:none}
+  .addbar button{background:var(--brand);border:0;color:#fff;border-radius:10px;padding:0 16px;font-weight:700;cursor:pointer}
+  .breadth{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+  .bard{flex:1;min-width:160px;height:14px;border-radius:7px;overflow:hidden;display:flex;background:#22304a}
+  .bard .u{background:var(--red)} .bard .d{background:var(--green)}
+  .breadth .txt{font-size:12.5px;color:var(--sub);white-space:nowrap}
+  .mbtns{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .mbtns button{background:var(--card);border:1px solid var(--line);color:var(--sub);border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer}
+  .mbtns button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .xbtn{color:var(--sub);cursor:pointer;font-size:13px;padding:2px 6px}
+  .xbtn:hover{color:var(--red)}
+  .addwatch{background:var(--card2);border:1px solid var(--line);color:var(--brand);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;margin-top:8px}
 </style>
 </head>
 <body>
@@ -75,58 +103,102 @@
     </div>
   </header>
 
+  <div class="nav">
+    <button id="tabStock" class="on" onclick="switchTab('stock')">🔍 个股</button>
+    <button id="tabWatch" onclick="switchTab('watch')">⭐ 自选监测</button>
+    <button id="tabMarket" onclick="switchTab('market')">🌐 全市场</button>
+  </div>
+
   <div class="search">
     <input id="inp" placeholder="输入6位代码或名称，如 600519 / 宁德时代" onkeydown="if(event.key==='Enter')doSearch()">
     <button onclick="doSearch()">查询</button>
   </div>
+
+  <div class="statusbar">
+    <span id="status"><span class="dot off"></span>监测状态加载中…</span>
+    <button onclick="manualRefresh()">↻ 立即刷新</button>
+  </div>
+
   <div class="chips" id="chips"></div>
 
-  <div id="loading" class="loading hidden">数据加载中…</div>
-  <div id="err" class="err hidden"></div>
-
-  <div id="main" class="hidden">
-    <div class="card">
-      <h3><span class="bar"></span>行情概览</h3>
-      <div class="ov" id="ov"></div>
+  <!-- ===== 个股视图 ===== -->
+  <div id="viewStock">
+    <div id="loading" class="loading hidden">数据加载中…</div>
+    <div id="err" class="err hidden"></div>
+    <div id="main" class="hidden">
+      <div class="card">
+        <h3><span class="bar"></span>行情概览 <button class="addwatch" onclick="addWatch(state.code)">+ 加入自选</button></h3>
+        <div class="ov" id="ov"></div>
+      </div>
+      <div class="card">
+        <h3><span class="bar"></span>K线 / 成交量</h3>
+        <div id="kline" class="chart"></div>
+      </div>
+      <div class="card">
+        <h3><span class="bar"></span>筹码峰（由K线+成交量自算 CYQ）</h3>
+        <div id="chip" class="chart" style="height:240px"></div>
+        <div class="chip-info" id="chipInfo"></div>
+      </div>
+      <div class="card">
+        <h3><span class="bar"></span>资金面</h3>
+        <div class="ov" id="fund"></div>
+      </div>
+      <div class="card">
+        <h3><span class="bar"></span>重大消息</h3>
+        <ul class="news" id="news"></ul>
+      </div>
+      <div class="card">
+        <h3><span class="bar"></span>AI 短评 <span class="tag" id="reviewTag">hy3 生成</span></h3>
+        <div class="dim" id="dims"></div>
+        <div style="margin-top:12px"><div class="summary" id="summary"></div></div>
+        <div style="margin-top:12px;font-weight:700;font-size:14px">短期应对策略</div>
+        <div class="strat" id="strategy" style="margin-top:6px"></div>
+        <div style="margin-top:12px;font-weight:700;font-size:14px">短期走势预测</div>
+        <div class="fc" id="forecast"></div>
+        <button class="btnCopy" id="btnCopy" onclick="copyToAI()">📋 复制数据，去问 AI 助手生成专业短评</button>
+      </div>
     </div>
+  </div>
 
-    <div class="card">
-      <h3><span class="bar"></span>K线 / 成交量</h3>
-      <div id="kline" class="chart"></div>
+  <!-- ===== 自选监测视图 ===== -->
+  <div id="viewWatch" class="hidden">
+    <div class="addbar">
+      <input id="watchIn" placeholder="添加自选股：代码或名称，如 600519 / 宁德时代" onkeydown="if(event.key==='Enter')addWatchFromInput()">
+      <button onclick="addWatchFromInput()">添加</button>
     </div>
-
     <div class="card">
-      <h3><span class="bar"></span>筹码峰（由K线+成交量自算 CYQ）</h3>
-      <div id="chip" class="chart" style="height:240px"></div>
-      <div class="chip-info" id="chipInfo"></div>
+      <h3><span class="bar"></span>自选股实时监测 <span class="muted" id="watchMeta"></span></h3>
+      <table class="tbl" id="watchTbl">
+        <thead><tr><th>名称 / 代码</th><th>现价</th><th>涨跌幅</th><th>振幅</th><th></th></tr></thead>
+        <tbody id="watchBody"></tbody>
+      </table>
     </div>
+  </div>
 
+  <!-- ===== 全市场视图 ===== -->
+  <div id="viewMarket" class="hidden">
     <div class="card">
-      <h3><span class="bar"></span>资金面</h3>
-      <div class="ov" id="fund"></div>
-    </div>
-
-    <div class="card">
-      <h3><span class="bar"></span>重大消息</h3>
-      <ul class="news" id="news"></ul>
-    </div>
-
-    <div class="card">
-      <h3><span class="bar"></span>AI 短评 <span class="tag" id="reviewTag">hy3 生成</span></h3>
-      <div class="dim" id="dims"></div>
-      <div style="margin-top:12px"><div class="summary" id="summary"></div></div>
-      <div style="margin-top:12px;font-weight:700;font-size:14px">短期应对策略</div>
-      <div class="strat" id="strategy" style="margin-top:6px"></div>
-      <div style="margin-top:12px;font-weight:700;font-size:14px">短期走势预测</div>
-      <div class="fc" id="forecast"></div>
-      <button class="btnCopy" id="btnCopy" onclick="copyToAI()">📋 复制数据，去问 AI 助手生成专业短评</button>
+      <h3><span class="bar"></span>市场广度 <span class="muted" id="mktMeta"></span></h3>
+      <div class="breadth">
+        <div class="bard" id="bard"><span class="u" style="width:0%"></span><span class="d" style="width:0%"></span></div>
+        <div class="txt" id="breadthTxt">—</div>
+      </div>
+      <div class="mbtns" id="mktBtns">
+        <button class="on" data-mode="up" onclick="setMarketMode('up')">涨幅榜</button>
+        <button data-mode="down" onclick="setMarketMode('down')">跌幅榜</button>
+        <button data-mode="amp" onclick="setMarketMode('amp')">振幅榜</button>
+      </div>
+      <table class="tbl" id="mktTbl">
+        <thead><tr><th>名称 / 代码</th><th>现价</th><th>涨跌幅</th><th>振幅</th></tr></thead>
+        <tbody id="mktBody"></tbody>
+      </table>
     </div>
   </div>
 
   <div class="foot">
-    数据来源：东方财富实时公开行情（K线/资金/估值/公告），筹码峰由 K线+成交量自算。<br>
-    4 只示例股含 AI 范例短评；其余股票由规则引擎生成速评，接入大模型后可升级为深度 AI 短评。<br>
-    也可直接把股票发给我（AI 助手），我基于真实数据给你写短评。
+    数据来源：腾讯财经 / 新浪财经实时公开行情（K线/资金/估值/公告），筹码峰由 K线+成交量自算。<br>
+    全市场 ~5198 只 A 股实时监测，误差 &lt; 5 分钟；4 只示例股含 AI 范例短评，其余走规则速评。<br>
+    也可直接把股票发给我（AI 助手），我基于真实数据给你写专业短评。
   </div>
 </div>
 
@@ -136,25 +208,25 @@ const FALLBACK_DATA = {
   "600519":{name:"贵州茅台",snapshot:{price:1324.97,prevClose:1329.00,changePct:-0.30,totalMktCap:1.656e12,floatMktCap:1.656e12},
     klines:[{d:"2026-09-21",o:1259,h:1259.95,l:1250.8,c:1252.57,v:2501689},{d:"2026-09-22",o:1252.15,h:1265.88,l:1248.1,c:1253.8,v:2457294},{d:"2026-09-23",o:1255.03,h:1271.5,l:1250.89,c:1251.24,v:3098122},{d:"2026-09-24",o:1250.01,h:1256.13,l:1231.05,c:1237,v:3123935},{d:"2026-09-28",o:1236,h:1244.01,l:1228.1,c:1243.88,v:2821830},{d:"2026-09-29",o:1244.6,h:1245.87,l:1230.88,c:1235.58,v:2636630},{d:"2026-09-30",o:1239.53,h:1268,l:1236.05,c:1258.62,v:3833098},{d:"2026-10-08",o:1252.9,h:1258,l:1242,c:1255.79,v:2516757},{d:"2026-10-09",o:1255.42,h:1282,l:1255.42,c:1263,v:3511051},{d:"2026-10-12",o:1262.95,h:1288,l:1261,c:1288,v:3155604},{d:"2026-10-13",o:1287,h:1288.48,l:1268.11,c:1274.89,v:2657276},{d:"2026-10-14",o:1270.1,h:1286.75,l:1266,c:1286,v:2377273},{d:"2026-10-15",o:1286,h:1317.76,l:1282,c:1312.97,v:5767722},{d:"2026-10-16",o:1311.57,h:1329.88,l:1301.68,c:1329,v:3850175},{d:"2026-10-19",o:1322.5,h:1348.6,l:1321,c:1324.97,v:3972894}],
     capital:{mainNetInflow:69870000,mainNetInflow5d:null,trend:[]},
-    news:[{t:"直销渠道(i茅台)持续放量，上半年新增用户约1744万",date:"2026-10-18"},{t:"市场化改革压缩渠道库存，社会库存降至低位",date:"2026-10-18"},{t:"10/12 重夺「A股股王」宝座，资金偏好回升",date:"2026-10-12"}],
+    news:[{title:"直销渠道(i茅台)持续放量，上半年新增用户约1744万",date:"2026-10-18"},{title:"市场化改革压缩渠道库存，社会库存降至低位",date:"2026-10-18"},{title:"10/12 重夺「A股股王」宝座，资金偏好回升",date:"2026-10-12"}],
     aiReview:{hy3:{chip:"近一月股价自1252元震荡上行至1325元，成交量在1280-1320区间最为密集，当前价位于区间上沿。底部获利盘积累较厚（获利比例约七成），但10/19盘中冲高1348后回落，1340-1350一带存在短线套牢盘，构成近期主要压力。",fund:"当日主力净流入约6987万元，结束前序小幅流出，资金态度边际转暖；但流入量级不大，属试探性回流，持续性待观察。",tech:"MACD金叉后红柱持续（DIFF 6.44＞DEA -3.35，MACD柱19.58），中期多头格局未破；短线在1320-1350遇阻，近一日微跌0.30%，属冲高后正常回踩。",news:"直销渠道持续放量、市场化改革压缩渠道库存、社会库存降至低位；重夺股王反映风险偏好回升。偏利好但非突发催化，属基本面韧性支撑。",summary:"筹码锁定+资金回流+技术多头+基本面稳，四因素共振偏多；但短线临近1350前高压力区，追高性价比一般。",strategy:"持仓者沿5日线持有，跌破1280(约10日线)减仓；冲高1340-1350不过可部分止盈。\n观望者不追高，回踩1280-1300且量能温和可低吸；放量突破1350站稳再跟进。\n风控：单笔≤总仓2成，1280止损。",forecast:{base:"1320-1350区间震荡消化获利盘，2-5日选方向（约55%）",bull:"放量突破1350打开至1400空间（约30%）",bear:"跌破1280回踩1250平台（约15%）"}},
     step5:{chip:"筹码结构上沿偏重，1340-1350短线套牢盘虽不重，但获利了结意愿随价格抬升增强，下方1280为密集成交支撑。",fund:"主力单日净流入不到7000万，相对茅台日均成交偏小，更像被动回流而非主动进攻，资金共识未形成。",tech:"MACD红柱放大但DIFF仍在零轴附近、DEA为负，多头尚未完全确认；量能未配合放大，反弹成色不足。",news:"改革与直销利好已被市场部分消化，缺少新催化前难独自驱动趋势。",summary:"偏多但动能偏弱，属于「有支撑、缺催化」的震荡市，不宜按强趋势处理。",strategy:"以区间交易为主：1280-1350内高抛低吸，突破1350放量才转多。\n仓位比 hy3 更保守（≤1.5成），止损1280。",forecast:{base:"1280-1350宽幅震荡（约50%）",bull:"温和放量站上1350看1400（约30%）",bear:"跌破1280下探1235-1250（约20%）"}}}},
   "300750":{name:"宁德时代",snapshot:{price:267.02,prevClose:277.00,changePct:-3.60,totalMktCap:1.18e12,floatMktCap:1.0e12},
     klines:[{d:"2026-09-21",o:303.04,h:303.6,l:295.5,c:297.1,v:49488323},{d:"2026-09-22",o:298,h:308.69,l:297.74,c:304.63,v:47381066},{d:"2026-09-23",o:304.5,h:305.76,l:299.1,c:301,v:24744055},{d:"2026-09-24",o:300,h:302,l:293,c:293.5,v:28008499},{d:"2026-09-28",o:289,h:292.66,l:286.66,c:291.99,v:33914360},{d:"2026-09-29",o:291,h:293.19,l:285.74,c:286.8,v:29875746},{d:"2026-09-30",o:290,h:292.7,l:285.8,c:291.11,v:29699471},{d:"2026-10-08",o:292,h:293.47,l:285.17,c:286.75,v:36682465},{d:"2026-10-09",o:292,h:301.42,l:289,c:297.75,v:54152671},{d:"2026-10-12",o:300.27,h:306.71,l:297.57,c:298.38,v:41706382},{d:"2026-10-13",o:297.9,h:297.99,l:286.7,c:289.1,v:40883532},{d:"2026-10-14",o:288,h:290.88,l:280.12,c:280.12,v:33459123},{d:"2026-10-15",o:274.98,h:282.01,l:272,c:278.5,v:41995232},{d:"2026-10-16",o:281.79,h:282,l:273.29,c:277,v:29742445},{d:"2026-10-19",o:275,h:275,l:267.02,c:267.02,v:31146043}],
     capital:{mainNetInflow:-461470158,mainNetInflow5d:null,trend:[]},
-    news:[{t:"已耗资33亿元回购A股（回购上限400亿）",date:"2026-10-08"},{t:"10/20 召开董事会审议第三季度业绩",date:"2026-10-02"},{t:"中报营收2769亿(+54.8%)、净利432.84亿(+41.98%)，研报称具性价比",date:"2026-10-15"}],
+    news:[{title:"已耗资33亿元回购A股（回购上限400亿）",date:"2026-10-08"},{title:"10/20 召开董事会审议第三季度业绩",date:"2026-10-02"},{title:"中报营收2769亿(+54.8%)、净利432.84亿(+41.98%)，研报称具性价比",date:"2026-10-15"}],
     aiReview:{hy3:{chip:"近一月股价自297元回落至267元，跌幅约10%；早期290-300高位区域成交密集，现已全面转为套牢盘，构成反弹主要压制。近期267-278低位有承接但量能一般，筹码结构偏空、获利比例低。",fund:"当日主力净流出约4.6亿元，近期呈持续净流出态势，大资金态度谨慎，未见回流信号。",tech:"MACD双线均处零轴下方（DIFF -18.57、DEA -18.62），红柱几近归零，空头占优、趋势偏弱；短线反抽缺乏量能配合。",news:"积极面：大额回购(上限400亿)、10/20审议Q3业绩、中报高增且研报称具性价比。事件驱动(Q3业绩)临近，存在预期博弈。",summary:"技术面与资金面偏弱、筹码上空方占优，但大额回购+Q3业绩窗口构成阶段性对冲，短期或呈「弱势中的事件博弈」。",strategy:"空仓者不急于抄底，待Q3业绩(10/20)落地、且出现放量止跌信号(如单日放量长下影)再介入。\n持仓者若成本高位，可借业绩窗口反弹至285-295减仓。\n风控：破260减仓，单笔≤1.5成。",forecast:{base:"260-285区间弱势震荡，等待业绩指引（约50%）",bull:"Q3超预期+回购加码，放量收复290（约30%）",bear:"业绩不及预期或破260，下探245-250（约20%）"}},
     step5:{chip:"高位套牢盘虽重，但267附近已出现连续地量企稳，恐慌抛压衰减，向下空间有限。",fund:"净流出4.6亿放在日均成交级别不算极端，且回购托底会逐步对冲抛压。",tech:"MACD柱逼近零轴、下跌动能衰竭，随时可能金叉修复。",news:"Q3业绩+400亿回购上限是强催化剂组合，市场预期差大，业绩日易出惊喜。",summary:"表面弱势、实则临近催化拐点，属于「利空出尽+事件驱动」的左侧布局窗口。",strategy:"激进者可小仓(≤1成)于265-270埋伏业绩，止损258；右侧者等放量站上285再加。\n整体比 hy3 更偏左侧乐观。",forecast:{base:"265-290震荡筑底（约45%）",bull:"业绩超预期放量突破295（约35%）",bear:"破258去250（约20%）"}}}},
   "002594":{name:"比亚迪",snapshot:{price:83.5,prevClose:82.72,changePct:0.94,totalMktCap:7.7e11,floatMktCap:7.7e11},
     klines:[{d:"2026-09-21",o:84.27,h:85.29,l:84.11,c:85.22,v:24832164},{d:"2026-09-22",o:85.59,h:87.2,l:85.46,c:86.58,v:33684722},{d:"2026-09-23",o:86,h:86.55,l:85.66,c:85.85,v:17315474},{d:"2026-09-24",o:85.7,h:86.02,l:84.23,c:84.34,v:18221596},{d:"2026-09-28",o:83.61,h:84.28,l:83.18,c:83.35,v:18236497},{d:"2026-09-29",o:83.2,h:83.42,l:81.7,c:82.02,v:21605586},{d:"2026-09-30",o:82.1,h:83.47,l:81.7,c:83.31,v:21667348},{d:"2026-10-08",o:82.98,h:83.19,l:81.51,c:81.72,v:24840572},{d:"2026-10-09",o:82.1,h:85.16,l:81.81,c:84.95,v:40197743},{d:"2026-10-12",o:85.6,h:86.18,l:84.13,c:84.6,v:26470419},{d:"2026-10-13",o:83.1,h:84.49,l:82.04,c:82.18,v:33633260},{d:"2026-10-14",o:82.25,h:82.57,l:81.1,c:81.44,v:21288217},{d:"2026-10-15",o:80.63,h:82.47,l:80.11,c:82.24,v:24275403},{d:"2026-10-16",o:82.24,h:83.39,l:81.85,c:82.72,v:20968562},{d:"2026-10-19",o:82.5,h:84.15,l:82.3,c:83.5,v:21901095}],
     capital:{mainNetInflow:14662960,mainNetInflow5d:null,trend:[]},
-    news:[{t:"9月销量46.4万辆创年内新高(同比+17%)，出口18.1万辆(同比+154%)",date:"2026-10-18"},{t:"高端化推进：方程豹/腾势/仰望合计6.2万辆(同比+65.7%)",date:"2026-10-18"},{t:"研报预计2026年净利润同比增长24%",date:"2026-10-18"}],
+    news:[{title:"9月销量46.4万辆创年内新高(同比+17%)，出口18.1万辆(同比+154%)",date:"2026-10-18"},{title:"高端化推进：方程豹/腾势/仰望合计6.2万辆(同比+65.7%)",date:"2026-10-18"},{title:"研报预计2026年净利润同比增长24%",date:"2026-10-18"}],
     aiReview:{hy3:{chip:"近一月股价在81-87元箱体震荡，成交分布较均匀，当前83.5位于中枢略偏上，筹码结构中性、无明显密集套牢或获利峰。",fund:"当日主力小幅净流入约1466万元，资金进出均衡，无明确方向性。",tech:"MACD双线贴近零轴（DIFF -1.24、DEA -1.36），红柱微露，多空弱平衡；价在84-86前高下有压制。",news:"9月销量创年内新高、出口高增、高端化明确；研报预计净利+24%。基本面强、结构升级清晰。",summary:"基本面强(销量/出口/高端化三线向好)但股价横盘、资金观望，呈「好公司等催化」的蓄势状态，向上需放量突破86。",strategy:"持仓者86下方持有，放量突破86且站稳可加仓；回踩81-82不破可低吸。\n观望者等突破或回踩低吸，单笔≤2成。止损80。",forecast:{base:"81-86箱体震荡蓄势（约55%）",bull:"放量突破86打开至92-95（约30%）",bear:"破80下探76-78（约15%）"}},
     step5:{chip:"箱体中枢筹码沉淀充分，83一带支撑有效，向下空间小。",fund:"小幅净流入虽不大，但在横盘市中属偏暖信号。",tech:"零轴附近红柱微露，随时可能转多。",news:"销量与出口数据超预期，是确定性最强的样本；横盘更像是业绩兑现前的沉淀。",summary:"基本面确定性高，当前横盘提供风险收益比不错的布局点，优于多数同板块。",strategy:"可在82-84区间分批建仓(≤2成)，突破86加仓；比 hy3 更建议主动布局而非纯等待。\n止损80。",forecast:{base:"82-87震荡偏强（约50%）",bull:"突破86看92（约35%）",bear:"破80看76（约15%）"}}}},
   "300059":{name:"东方财富",snapshot:{price:18.08,prevClose:18.11,changePct:-0.17,totalMktCap:2.9e11,floatMktCap:2.9e11},
     klines:[{d:"2026-09-21",o:18.38,h:18.75,l:18.37,c:18.69,v:184716458},{d:"2026-09-22",o:18.75,h:18.94,l:18.63,c:18.77,v:184702167},{d:"2026-09-23",o:18.69,h:18.76,l:18.6,c:18.65,v:105666310},{d:"2026-09-24",o:18.56,h:18.63,l:18.26,c:18.28,v:118407597},{d:"2026-09-28",o:18.2,h:18.3,l:17.84,c:17.87,v:154647212},{d:"2026-09-29",o:17.92,h:17.98,l:17.7,c:17.77,v:128819064},{d:"2026-09-30",o:17.85,h:17.88,l:17.71,c:17.79,v:103564352},{d:"2026-10-08",o:17.74,h:17.85,l:17.23,c:17.28,v:185379082},{d:"2026-10-09",o:17.21,h:18.09,l:17.18,c:17.95,v:259568282},{d:"2026-10-12",o:17.88,h:17.95,l:17.79,c:17.84,v:123466537},{d:"2026-10-13",o:17.71,h:18.26,l:17.65,c:18.06,v:217420603},{d:"2026-10-14",o:17.96,h:18.12,l:17.92,c:17.98,v:116215998},{d:"2026-10-15",o:17.78,h:18.48,l:17.68,c:18.32,v:281614800},{d:"2026-10-16",o:18.3,h:18.34,l:17.93,c:18.11,v:185267844},{d:"2026-10-19",o:18.03,h:18.2,l:17.98,c:18.08,v:122849193}],
     capital:{mainNetInflow:-151003968,mainNetInflow5d:null,trend:[]},
-    news:[{t:"中报营收105亿(+53%)、净利80.6亿(+45%)创历史最佳，但与两市成交额深度绑定",date:"2026-10-10"},{t:"年内跌超23%，机构减持、实控人减持预期压制",date:"2026-10-06"},{t:"两市成交较历史天量萎缩超64%，地量环境压预期，融资余额连降",date:"2026-09-30"}],
+    news:[{title:"中报营收105亿(+53%)、净利80.6亿(+45%)创历史最佳，但与两市成交额深度绑定",date:"2026-10-10"},{title:"年内跌超23%，机构减持、实控人减持预期压制",date:"2026-10-06"},{title:"两市成交较历史天量萎缩超64%，地量环境压预期，融资余额连降",date:"2026-09-30"}],
     aiReview:{hy3:{chip:"近一月17.2-18.9元箱体，当前18.08处中枢，10/15放巨量冲18.32后回落，该价位附近有短线套牢；筹码结构中性偏弱。",fund:"当日主力净流出约1.5亿元，近期大资金偏谨慎，与「机构跑路」报道一致。",tech:"MACD双线零轴下方微多（DIFF -0.237、DEA -0.296，红柱0.118），弱修复；价受18.3-18.5压制。",news:"中报历史最佳，但年内跌超23%、机构减持、实控人减持预期；作为券商龙头与成交额深度绑定，当前成交地量压制预期，融资余额连降。",summary:"业绩强但股价弱、量能萎缩+减持预期形成压制，属「基本面与筹码博弈」的弱势震荡，弹性取决于成交额回暖。",strategy:"观望为主，不接飞刀；待两市成交额重回1.8万亿+且股价站稳18.5再考虑。\n持仓者反弹18.3-18.5减仓。风控破17止损，单笔≤1成。",forecast:{base:"17-18.5地量阴跌震荡（约50%）",bull:"成交额放量重回1.8万亿，突破18.5看20（约30%）",bear:"破17下探15.5-16（约20%）"}},
     step5:{chip:"高位机构持续出货，筹码向散户转移，结构恶化。",fund:"主力连续净流出+融资余额连降，杠杆与机构同步撤退。",tech:"弱修复难改下行趋势，18.5压力明确。",news:"减持预期+成交地量是中期压制，业绩利好已「见光死」。",summary:"最弱的样本，业绩与股价背离短期难解，宜回避。",strategy:"回避或仅反弹减仓；若持有破17无条件降仓。比 hy3 更偏防守。\n单笔≤1成，破17清。",forecast:{base:"16.5-18弱势盘跌（约45%）",bull:"成交回暖站18.5（约30%）",bear:"破17去15（约25%）"}}}}
 };
@@ -162,21 +234,30 @@ const FALLBACK_DATA = {
 const SAMPLES=[{code:"600519",name:"贵州茅台"},{code:"300750",name:"宁德时代"},{code:"002594",name:"比亚迪"},{code:"300059",name:"东方财富"}];
 const ALIAS={"茅台":"600519","宁德":"300750","宁德时代":"300750","比亚迪":"002594","东财":"300059","东方财富":"300059","平安":"601318","招行":"600036","五粮液":"000858","隆基":"601012","中芯":"688981"};
 
-let state={code:"600519",model:"hy3",data:null};
-let klineChart,chipChart;
-
-// 发布链接带 ?sharecode=，需透传给 API 以通过代理鉴权
 const SHARE = new URLSearchParams(location.search).get('sharecode');
 function withShare(url){ return SHARE ? url + (url.includes('?')?'&':'?') + 'sharecode=' + encodeURIComponent(SHARE) : url; }
 
-/* ===== 客户端计算（兜底/图表用） ===== */
+let state={ tab:'stock', model:'hy3', code:'600519', data:null,
+  watch: loadWatch(), market:{mode:'up',list:[],breadth:null,updatedAt:0,loading:false} };
+let klineChart,chipChart;
+
+function loadWatch(){ try{ return JSON.parse(localStorage.getItem('sse_watch')||'["600519","300750","002594","300059"]'); }catch(e){ return ["600519","300750","002594","300059"]; } }
+function saveWatch(){ localStorage.setItem('sse_watch', JSON.stringify(state.watch)); }
+
+function isTrading(){
+  const d=new Date(), day=d.getDay(); if(day===0||day===6) return false;
+  const t=d.getHours()*60+d.getMinutes();
+  return (t>=9*60+15 && t<=11*60+30) || (t>=13*60 && t<=15*60);
+}
+
+/* ===== 客户端计算（图表/兜底用） ===== */
 function computeCYQ(klines,price){
   const arr=[...klines]; let minL=Infinity,maxH=-Infinity;
   arr.forEach(d=>{minL=Math.min(minL,d.l);maxH=Math.max(maxH,d.h);});
   const N=60,step=(maxH-minL)/N; let bins=new Array(N).fill(0); const decay=0.985;
   arr.forEach(d=>{ bins=bins.map(v=>v*decay);
     const s=Math.max(0,Math.floor((d.l-minL)/step)),e=Math.min(N-1,Math.floor((d.h-minL)/step));
-    const len=Math.max(1,e-s+1),c=d.c;
+    const c=d.c;
     for(let i=s;i<=e;i++){const p=minL+(i+0.5)*step;let w=1-Math.abs(p-c)/((d.h-d.l)||1);if(w<0)w=0;bins[i]+=d.v*w;}
   });
   const total=bins.reduce((a,b)=>a+b,0)||1; const cur=price; let profit=0,cost=0;
@@ -193,15 +274,27 @@ function computeMACD(klines){
   let sig=last.diff>last.dea?'多头':'空头';
   return {diff:+last.diff.toFixed(3),dea:+last.dea.toFixed(3),signal:sig};
 }
-
-/* ===== 工具 ===== */
 function fmtCap(v){if(v==null)return '—';const a=Math.abs(v);if(a>=1e8)return (v/1e8).toFixed(2)+"亿";if(a>=1e4)return (v/1e4).toFixed(0)+"万";return v.toFixed(0);}
 function fmtMkt(v){if(v==null)return '—';if(v>=1e12)return (v/1e12).toFixed(2)+"万亿";if(v>=1e8)return (v/1e8).toFixed(0)+"亿";return v;}
 function getTech(j){ if(j.tech) return j.tech; return computeMACD(j.klines); }
 
-/* ===== 加载 ===== */
+/* ===== 标签切换 ===== */
+function switchTab(tab){
+  state.tab=tab;
+  ['stock','watch','market'].forEach(t=>{
+    document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).className = (t===tab?'on':'');
+    document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('hidden', t!==tab);
+  });
+  if(tab==='watch') refreshWatch();
+  if(tab==='market') refreshMarket();
+  if(tab==='stock' && !state.data) load(state.code);
+  updateStatus();
+}
+
+/* ===== 个股加载 ===== */
 async function load(code){
-  state.code=code;
+  state.code=code; state.tab='stock';
+  switchTab('stock');
   document.getElementById("loading").classList.remove("hidden");
   document.getElementById("main").classList.add("hidden");
   document.getElementById("err").classList.add("hidden");
@@ -214,7 +307,7 @@ async function load(code){
     if(FALLBACK_DATA[code]){ state.data={...FALLBACK_DATA[code],_fallback:true}; render(); }
     else { document.getElementById("loading").classList.add("hidden");
       document.getElementById("err").classList.remove("hidden");
-      document.getElementById("err").textContent="加载失败："+e.message+"（示例股可用，其他股票需联网部署版）"; }
+      document.getElementById("err").textContent="加载失败："+e.message; }
   }
 }
 async function doSearch(){
@@ -222,7 +315,6 @@ async function doSearch(){
   if(!q) return;
   if(/^\d{6}$/.test(q)){ load(q); return; }
   const key=ALIAS[q]; if(key){ load(key); return; }
-  // 在线搜索
   try{
     const r=await fetch(withShare('/api/search?q='+encodeURIComponent(q))); const j=await r.json();
     if(j.list&&j.list.length){ load(j.list[0].code); return; }
@@ -237,7 +329,100 @@ function setModel(m){
   if(state.data) renderReview();
 }
 
-/* ===== 渲染 ===== */
+/* ===== 自选 ===== */
+function addWatch(code){ if(!state.watch.includes(code)){ state.watch.unshift(code); saveWatch(); } if(state.tab==='watch') refreshWatch(); }
+function removeWatch(code){ state.watch=state.watch.filter(c=>c!==code); saveWatch(); refreshWatch(); }
+async function addWatchFromInput(){
+  const v=document.getElementById("watchIn").value.trim(); if(!v) return;
+  let code=null;
+  if(/^\d{6}$/.test(v)) code=v;
+  else if(ALIAS[v]) code=ALIAS[v];
+  else { try{ const r=await fetch(withShare('/api/search?q='+encodeURIComponent(v))); const j=await r.json(); if(j.list&&j.list.length) code=j.list[0].code; }catch(e){} }
+  if(code){ addWatch(code); document.getElementById("watchIn").value=''; }
+  else alert("未找到该股票");
+}
+async function refreshWatch(){
+  if(!state.watch.length){ document.getElementById("watchBody").innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--sub)">暂无自选股，上方输入框添加</td></tr>'; document.getElementById("watchMeta").textContent=''; return; }
+  try{
+    const r=await fetch(withShare('/api/quotes?codes='+state.watch.join(',')));
+    const j=await r.json();
+    const list=j.list||[];
+    document.getElementById("watchMeta").textContent='· 数据源 '+ (j.source||'-') +' · 更新 '+ new Date(j.updatedAt||Date.now()).toLocaleTimeString();
+    document.getElementById("watchBody").innerHTML = list.map(q=>rowHTML(q,true)).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--sub)">无数据</td></tr>';
+  }catch(e){ document.getElementById("watchBody").innerHTML='<tr><td colspan="5" style="text-align:center;color:#ff8a8a">刷新失败：'+e.message+'</td></tr>'; }
+}
+function rowHTML(q,watch){
+  const cls=q.changePct>=0?'up':'down', sign=q.changePct>=0?'+':'';
+  return `<tr onclick="load('${q.code}')">
+    <td>${q.name}<div class="code">${q.code}</div></td>
+    <td>${q.price!=null?q.price:'-'}</td>
+    <td class="${cls}">${sign}${q.changePct!=null?q.changePct:'-'}%</td>
+    <td>${q.amp!=null?q.amp:'-'}%</td>
+    ${watch?`<td><span class="xbtn" onclick="event.stopPropagation();removeWatch('${q.code}')">✕</span></td>`:''}
+  </tr>`;
+}
+
+/* ===== 全市场 ===== */
+function setMarketMode(mode){
+  state.market.mode=mode;
+  document.querySelectorAll('#mktBtns button').forEach(b=>b.classList.toggle('on', b.dataset.mode===mode));
+  refreshMarket();
+}
+async function refreshMarket(){
+  if(state.market.loading) return;
+  state.market.loading=true;
+  try{
+    const r=await fetch(withShare('/api/market?mode='+state.market.mode+'&limit=40'));
+    const j=await r.json();
+    state.market.list=j.stocks||[]; state.market.breadth=j.breadth; state.market.updatedAt=j.updatedAt||Date.now();
+    const b=j.breadth;
+    if(b){
+      const upPct=Math.min(100,b.upRatio||0);
+      document.getElementById("bard").innerHTML=`<span class="u" style="width:${upPct}%"></span><span class="d" style="width:${100-upPct}%"></span>`;
+      document.getElementById("breadthTxt").innerHTML=`上涨 <b class="up">${b.up}</b> · 下跌 <b class="down">${b.down}</b> · 涨停 ${b.limitUp} · 跌停 ${b.limitDown} · 平 ${b.flat}`;
+    }
+    document.getElementById("mktMeta").textContent='· 覆盖 '+j.count+'/'+j.total+' · 源 '+(j.source||'-')+' · '+ new Date(state.market.updatedAt).toLocaleTimeString();
+    document.getElementById("mktBody").innerHTML = state.market.list.map(q=>rowHTML(q,false)).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--sub)">无数据</td></tr>';
+  }catch(e){ document.getElementById("mktBody").innerHTML='<tr><td colspan="4" style="text-align:center;color:#ff8a8a">刷新失败：'+e.message+'</td></tr>'; }
+  state.market.loading=false;
+}
+
+/* ===== 状态栏 ===== */
+function updateStatus(){
+  const dot=document.querySelector('#status .dot');
+  const trading=isTrading();
+  dot.className='dot '+(trading?'on':'off');
+  let txt = trading ? '● 实时监测中（交易时段，每30秒自动刷新）' : '○ 非交易时段（数据为最近可用行情，开盘后自动监测）';
+  let lag='';
+  if(state.tab==='market' && state.market.updatedAt){ lag=' · 数据延迟 '+Math.max(0,Math.round((Date.now()-state.market.updatedAt)/1000))+'s'; }
+  if(state.tab==='watch'){ lag=' · 已自动刷新'; }
+  document.getElementById('status').innerHTML='<span class="dot '+(trading?'on':'off')+'></span>'+txt+lag;
+}
+async function manualRefresh(){
+  if(state.tab==='watch') await refreshWatch();
+  else if(state.tab==='market') await refreshMarket();
+  else if(state.data) await refreshDetailPrice();
+  updateStatus();
+}
+async function refreshDetailPrice(){
+  if(!state.code) return;
+  try{
+    const r=await fetch(withShare('/api/quotes?codes='+state.code));
+    const j=await r.json(); const q=(j.list||[])[0];
+    if(q && state.data){ state.data.snapshot.price=q.price; state.data.snapshot.changePct=q.changePct;
+      const sn=state.data.snapshot, chgCls=sn.changePct>=0?'up':'down', chgSign=sn.changePct>=0?'+':'';
+      const pe=(sn.pe?`<div class="it"><div class="k">PE(TTM)</div><div class="v">${sn.pe}</div></div>`:'');
+      const pb=(sn.pb?`<div class="it"><div class="k">PB</div><div class="v">${sn.pb}</div></div>`:'');
+      document.getElementById("ov").innerHTML=
+        `<div class="it"><div class="k">名称</div><div class="v" style="font-size:16px">${state.data.name}</div></div>`+
+        `<div class="it"><div class="k">现价</div><div class="v" id="ovPrice">${sn.price}</div></div>`+
+        `<div class="it"><div class="k">涨跌幅</div><div class="v ${chgCls}" id="ovChg">${chgSign}${sn.changePct}%</div></div>`+
+        pe+pb+`<div class="it"><div class="k">总市值</div><div class="v" style="font-size:15px">${fmtMkt(sn.totalMktCap)}</div></div>`;
+    }
+  }catch(e){}
+}
+
+/* ===== 渲染个股 ===== */
 function buildChips(){
   const box=document.getElementById("chips"); box.innerHTML="";
   SAMPLES.forEach(s=>{ const el=document.createElement("div");
@@ -248,15 +433,11 @@ function render(){
   const j=state.data;
   document.getElementById("loading").classList.add("hidden");
   document.getElementById("main").classList.remove("hidden");
-  if(j._fallback) document.getElementById("err").className="err"; // 不显示
-  // 标记 chip
-  [...document.querySelectorAll(".chip")].forEach(c=>c.classList.remove("on"));
-  [...document.querySelectorAll(".chip")].forEach(c=>{ if(c.textContent===SAMPLES.find(s=>s.code===j.code)?.name) c.classList.add("on"); });
   const sn=j.snapshot, chgCls=sn.changePct>=0?"up":"down", chgSign=sn.changePct>=0?"+":"";
   document.getElementById("ov").innerHTML=
     `<div class="it"><div class="k">名称</div><div class="v" style="font-size:16px">${j.name}</div></div>`+
-    `<div class="it"><div class="k">现价</div><div class="v">${sn.price}</div></div>`+
-    `<div class="it"><div class="k">涨跌幅</div><div class="v ${chgCls}">${chgSign}${sn.changePct}%</div></div>`+
+    `<div class="it"><div class="k">现价</div><div class="v" id="ovPrice">${sn.price}</div></div>`+
+    `<div class="it"><div class="k">涨跌幅</div><div class="v ${chgCls}" id="ovChg">${chgSign}${sn.changePct}%</div></div>`+
     (sn.pe?`<div class="it"><div class="k">PE(TTM)</div><div class="v">${sn.pe}</div></div>`:'')+
     (sn.pb?`<div class="it"><div class="k">PB</div><div class="v">${sn.pb}</div></div>`:'')+
     `<div class="it"><div class="k">总市值</div><div class="v" style="font-size:15px">${fmtMkt(sn.totalMktCap)}</div></div>`;
@@ -327,7 +508,9 @@ function copyToAI(){
 }
 
 /* ===== 初始化 ===== */
-buildChips(); load("600519");
+buildChips();
+switchTab('stock'); load('600519');
+setInterval(()=>{ if(isTrading()){ if(state.tab==='watch') refreshWatch(); else if(state.tab==='market') refreshMarket(); else if(state.data) refreshDetailPrice(); updateStatus(); } }, 30000);
 window.addEventListener("resize",()=>{if(klineChart)klineChart.resize();if(chipChart)chipChart.resize();});
 </script>
 </body>
