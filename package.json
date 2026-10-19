@@ -1,0 +1,12 @@
+{
+  "name": "stock-short-elf",
+  "version": "1.0.0",
+  "description": "股票短线精灵 - 结合筹码峰/资金面/K线/消息的 AI 短评工具",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
