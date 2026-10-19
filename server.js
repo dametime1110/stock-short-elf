@@ -75,3 +75,20 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log('股票短线精灵 running on http://0.0.0.0:' + PORT);
 });
+
+/* ===== 进程级"内置看门狗"（2026-10-20 加）=====
+   无状态 HTTP 服务，任何逃逸的未捕获异常（定时器回调/流事件/异步链外抛错）
+   都不应该让整个进程退出——否则服务会挂到平台重启为止。
+   这里捕获并记录，服务继续对外响应。 */
+process.on('uncaughtException', e => {
+  console.error('[看门狗·未捕获异常 已兜底，服务继续运行]', (e && e.stack) || e);
+});
+process.on('unhandledRejection', e => {
+  console.error('[看门狗·未处理的Promise拒绝 已兜底，服务继续运行]', (e && e.stack) || e);
+});
+
+/* 心跳日志：每 5 分钟一行，平台日志里可确认服务还活着（排查看门狗是否需要外部介入） */
+const _hb = setInterval(() => {
+  console.log('[心跳] ' + new Date().toISOString() + ' alive, uptime=' + Math.round(process.uptime()) + 's');
+}, 5 * 60 * 1000);
+_hb.unref();
