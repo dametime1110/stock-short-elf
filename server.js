@@ -66,8 +66,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 静态前端
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  // 静态前端（no-store：修复后用户刷新必须立刻拿到新版，避免旧版 JS 缓存导致"搜索不切换"）
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store, must-revalidate', 'Pragma': 'no-cache' });
   res.end(HTML);
 });
 

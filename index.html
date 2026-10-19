@@ -260,8 +260,21 @@ function isTrading(){
 }
 
 /* ===== 客户端计算（图表/兜底用） ===== */
+/* K线字段归一化：接口返回全名(date/open/close/high/low/volume)，
+   内置兜底样本用简写(d/o/c/h/l/v)——统一成简写供图表与指标计算，
+   缺失字段填 0（防止 undefined 让渲染抛错整页停更，2026-10-20 修复） */
+function normKlines(kl){
+  return (kl||[]).map(k=>({
+    d:  k.d  ?? k.date  ?? '',
+    o:  +(k.o  ?? k.open  ?? 0),
+    c:  +(k.c  ?? k.close ?? 0),
+    h:  +(k.h  ?? k.high  ?? 0),
+    l:  +(k.l  ?? k.low   ?? 0),
+    v:  +(k.v  ?? k.volume ?? 0),
+  }));
+}
 function computeCYQ(klines,price){
-  const arr=[...klines]; let minL=Infinity,maxH=-Infinity;
+  const arr=normKlines(klines); let minL=Infinity,maxH=-Infinity;
   arr.forEach(d=>{minL=Math.min(minL,d.l);maxH=Math.max(maxH,d.h);});
   const N=60,step=(maxH-minL)/N; let bins=new Array(N).fill(0); const decay=0.985;
   arr.forEach(d=>{ bins=bins.map(v=>v*decay);
@@ -277,7 +290,8 @@ function computeCYQ(klines,price){
 }
 function ema(a,n){const k=2/(n+1);let p=a[0];return a.map((v,i)=>{p=i===0?v:v*k+p*(1-k);return p;});}
 function computeMACD(klines){
-  const c=klines.map(d=>d.c); const e12=ema(c,12),e26=ema(c,26);
+  const kl=normKlines(klines);
+  const c=kl.map(d=>d.c); const e12=ema(c,12),e26=ema(c,26);
   const diff=c.map((_,i)=>e12[i]-e26[i]); const dea=ema(diff,9);
   const last={diff:diff[c.length-1],dea:dea[c.length-1]};
   let sig=last.diff>last.dea?'多头':'空头';
@@ -466,21 +480,25 @@ function render(){
   const j=state.data;
   document.getElementById("loading").classList.add("hidden");
   document.getElementById("main").classList.remove("hidden");
-  const sn=j.snapshot, chgCls=sn.changePct>=0?"up":"down", chgSign=sn.changePct>=0?"+":"";
+  const sn=j.snapshot||{}, chgCls=(sn.changePct||0)>=0?"up":"down", chgSign=(sn.changePct||0)>=0?"+":"";
   document.getElementById("ov").innerHTML=
-    `<div class="it"><div class="k">名称</div><div class="v" style="font-size:16px">${j.name}</div></div>`+
-    `<div class="it"><div class="k">现价</div><div class="v" id="ovPrice">${sn.price}</div></div>`+
-    `<div class="it"><div class="k">涨跌幅</div><div class="v ${chgCls}" id="ovChg">${chgSign}${sn.changePct}%</div></div>`+
+    `<div class="it"><div class="k">名称</div><div class="v" style="font-size:16px">${j.name||j.code||'—'}</div></div>`+
+    `<div class="it"><div class="k">现价</div><div class="v" id="ovPrice">${sn.price??'—'}</div></div>`+
+    `<div class="it"><div class="k">涨跌幅</div><div class="v ${chgCls}" id="ovChg">${chgSign}${sn.changePct??'—'}%</div></div>`+
     (sn.pe?`<div class="it"><div class="k">PE(TTM)</div><div class="v">${sn.pe}</div></div>`:'')+
     (sn.pb?`<div class="it"><div class="k">PB</div><div class="v">${sn.pb}</div></div>`:'')+
     `<div class="it"><div class="k">总市值</div><div class="v" style="font-size:15px">${fmtMkt(sn.totalMktCap)}</div></div>`;
-  renderKline(j); renderChip(j); renderFund(j);
-  document.getElementById("news").innerHTML=(j.news||[]).map(n=>`<li>${n.title}<span class="d">${n.date||''}</span></li>`).join("")||'<li>暂无公告</li>';
-  renderReview();
+  // 分区容错：任一区块渲染失败只影响该区块，不再让整页停在旧数据（2026-10-20）
+  try{ renderKline(j); }catch(e){ console.warn('K线渲染失败:',e); }
+  try{ renderChip(j); }catch(e){ console.warn('筹码渲染失败:',e); }
+  try{ renderFund(j); }catch(e){ console.warn('资金渲染失败:',e); }
+  try{ document.getElementById("news").innerHTML=(j.news||[]).map(n=>`<li>${n.title}<span class="d">${n.date||''}</span></li>`).join("")||'<li>暂无公告</li>'; }
+  catch(e){ console.warn('新闻渲染失败:',e); }
+  try{ renderReview(); }catch(e){ console.warn('短评渲染失败:',e); }
 }
 function renderKline(j){
   if(!klineChart) klineChart=echarts.init(document.getElementById("kline"));
-  const arr=[...j.klines].reverse(); const dates=arr.map(d=>d.d.slice(5));
+  const arr=normKlines(j.klines).reverse(); const dates=arr.map(d=>d.d.slice(5));
   klineChart.setOption({grid:[{left:52,right:14,top:14,height:"62%"},{left:52,right:14,top:"72%",height:"20%"}],
     xAxis:[{type:"category",data:dates,axisLabel:{color:"#93a1ba",fontSize:10},axisLine:{lineStyle:{color:"#2a3550"}}},
            {type:"category",data:dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:"#2a3550"}}}],
@@ -528,10 +546,11 @@ function renderReview(){
   document.getElementById("dims").innerHTML=dims.map(d=>`<div class="d"><div class="t">${d.t}</div><div class="x">${d.x}</div></div>`).join("");
   document.getElementById("summary").textContent="综合短评："+r.summary;
   document.getElementById("strategy").textContent=r.strategy;
+  const fc=r.forecast||{};
   document.getElementById("forecast").innerHTML=
-    `<div class="f b"><div class="h">基准情景</div>${r.forecast.base}</div>`+
-    `<div class="f u"><div class="h">乐观情景</div>${r.forecast.bull}</div>`+
-    `<div class="f e"><div class="h">悲观情景</div>${r.forecast.bear}</div>`;
+    `<div class="f b"><div class="h">基准情景</div>${fc.base||'—'}</div>`+
+    `<div class="f u"><div class="h">乐观情景</div>${fc.bull||'—'}</div>`+
+    `<div class="f e"><div class="h">悲观情景</div>${fc.bear||'—'}</div>`;
 }
 function copyToAI(){
   const j=state.data; if(!j) return;
