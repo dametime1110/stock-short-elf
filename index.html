@@ -755,7 +755,7 @@ function renderIntraday(j){
   const it=j.intraday, tip=document.getElementById("intradayTip"), vd=document.getElementById("intradayVerdict");
   if(!it || !Array.isArray(it.points) || it.points.length<10){
     if(intradayChart){ try{ intradayChart.clear(); }catch(e){} }
-    tip.textContent="分时数据暂不可用（休市或数据源波动，不影响其他数据）"; tip.classList.remove("hidden");
+    tip.textContent="分时数据暂不可用（数据源限流或休市，稍后重试；K线/KDJ图可正常查看）"; tip.classList.remove("hidden");
     vd.innerHTML=''; return;
   }
   tip.classList.add("hidden");
@@ -841,7 +841,8 @@ function renderFund(j){
     `<div class="it"><div class="k">KDJ D值</div><div class="v ${kdj.d>=80?'down':kdj.d<=20?'up':''}">${kdj.d}</div></div>`+
     `<div class="it"><div class="k">KDJ J值</div><div class="v ${kdj.j>=100?'down':kdj.j<=0?'up':''}">${kdj.j}${kdj.jExtreme?' <span style="font-size:10px">('+kdj.jExtreme+')</span>':''}</div></div>`+
     `<div class="it"><div class="k">KDJ 状态</div><div class="v" style="font-size:13px">${kdjState()}</div></div>`
-    :`<div class="it"><div class="k">KDJ</div><div class="v" style="font-size:13px;color:var(--sub)">数据不足</div></div>`);
+    :`<div class="it"><div class="k">KDJ</div><div class="v" style="font-size:13px;color:var(--sub)">数据不足</div></div>`)+
+    (m==null?`<div class="it" style="grid-column:1/-1"><div class="k" style="font-size:11px;color:var(--sub)">主力资金数据源维护中（限流），可参考上方分时量价判定与K线量能</div></div>`:'');
 }
 function renderReview(){
   const j=state.data, m=state.model;
