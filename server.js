@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { analyze, search, getLiveQuotes, getMarketView, refreshStockList } = require('./lib/analyzer');
+const { analyze, search, getLiveQuotes, getMarketView, refreshStockList, startHotFlowRefresh } = require('./lib/analyzer');
 
 const PORT = process.env.PORT || 3000;
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
@@ -75,6 +75,8 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('股票短线精灵 running on http://0.0.0.0:' + PORT);
+  // 资金流预热刷新：盘中每5分钟后台重试最近访问过的股票（东财接口间歇限流，抓住放行窗口写入当日缓存）
+  startHotFlowRefresh();
 });
 
 /* ===== 进程级"内置看门狗"（2026-10-20 加）=====
