@@ -190,7 +190,7 @@
       </div>
       <div id="scoreCard"></div>
       <div class="card">
-        <h3><span class="bar"></span>K线 / 成交量</h3>
+        <h3><span class="bar"></span>K线 / 成交量 / KDJ <span class="muted" style="font-size:11px;font-weight:400">KDJ：K紫 D橙 J青，80以上超买 / 20以下超卖</span></h3>
         <div id="kline" class="chart"></div>
         <div id="klineTip" class="hidden" style="text-align:center;color:#93a1ba;padding:30px 10px;font-size:13px"></div>
       </div>
@@ -387,6 +387,36 @@ function computeMACD(klines){
 function fmtCap(v){if(v==null)return '—';const a=Math.abs(v);if(a>=1e8)return (v/1e8).toFixed(2)+"亿";if(a>=1e4)return (v/1e4).toFixed(0)+"万";return v.toFixed(0);}
 function fmtMkt(v){if(v==null)return '—';if(v>=1e12)return (v/1e12).toFixed(2)+"万亿";if(v>=1e8)return (v/1e8).toFixed(0)+"亿";return v;}
 function getTech(j){ if(j.tech) return j.tech; return computeMACD(j.klines); }
+// KDJ 序列（前端版，与K线等长供副图）：RSV→K=(2K+RSV)/3→D=(2D+K)/2→J=3K-2D
+function computeKDJSeries(kl,n=9,m1=3,m2=2){
+  const c=kl.map(d=>d.c),h=kl.map(d=>d.h),l=kl.map(d=>d.l),N=c.length;
+  if(N<n+m1+m2+2) return null;
+  const K=[],D=[]; let kp=50,dp=50;
+  for(let i=0;i<N;i++){
+    if(i<n-1){K.push(50);D.push(50);continue;}
+    let hh=-Infinity,ll=Infinity;
+    for(let j=i-n+1;j<=i;j++){if(h[j]>hh)hh=h[j];if(l[j]<ll)ll=l[j];}
+    const rsv=hh>ll?(c[i]-ll)/(hh-ll)*100:50;
+    kp=(kp*(m1-1)+rsv)/m1; dp=(dp*(m2-1)+kp)/m2;
+    K.push(+kp.toFixed(1)); D.push(+dp.toFixed(1));
+  }
+  const J=K.map((k,i)=>+(3*k-2*D[i]).toFixed(1));
+  return {K,D,J};
+}
+function getKdj(j,kl){
+  if(j.kdj && j.kdj.series) return j.kdj;
+  const s=computeKDJSeries(kl);
+  if(!s) return null;
+  const N=s.K.length,k=s.K[N-1],d=s.D[N-1],jj=s.J[N-1];
+  let zone='neutral';
+  if(k>=80||jj>=100)zone='overbought'; else if(k<=20||jj<=0)zone='oversold';
+  let signal;
+  if(k>d&&s.K[N-2]<=s.D[N-2])signal=zone==='oversold'?'低位金叉':'金叉';
+  else if(k<d&&s.K[N-2]>=s.D[N-2])signal=zone==='overbought'?'高位死叉':'死叉';
+  else if(zone==='overbought')signal='超买'; else if(zone==='oversold')signal='超卖';
+  else signal=k>d?'多头排列':'空头排列';
+  return {k,d,j:jj,signal,zone,zoneLabel:zone==='overbought'?'超买区（≥80）':zone==='oversold'?'超卖区（≤20）':'中性区（20-80）',series:{k:s.K,d:s.D,j:s.J}};
+}
 
 /* ===== 标签切换 ===== */
 function switchTab(tab){
@@ -700,14 +730,23 @@ function renderKline(j){
   document.getElementById("klineTip").classList.add("hidden");
   if(!klineChart) klineChart=echarts.init(document.getElementById("kline"));
   const arr=kl; const dates=arr.map(d=>d.d.slice(5));   // API 已保证旧→新正序，直接按时间从左到右画（2026-10-20 修：去掉多余的 reverse，原来左边最新右边最旧）
-  klineChart.setOption({grid:[{left:52,right:14,top:14,height:"62%"},{left:52,right:14,top:"72%",height:"20%"}],
+  const kdjS=computeKDJSeries(arr);                       // KDJ 副图序列（与K线等长）
+  klineChart.setOption({grid:[{left:52,right:14,top:14,height:"44%"},{left:52,right:14,top:"62%",height:"13%"},{left:52,right:14,top:"79%",height:"15%"}],
     xAxis:[{type:"category",data:dates,axisLabel:{color:"#93a1ba",fontSize:10},axisLine:{lineStyle:{color:"#2a3550"}}},
-           {type:"category",data:dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:"#2a3550"}}}],
+           {type:"category",data:dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:"#2a3550"}}},
+           {type:"category",data:dates,gridIndex:2,axisLabel:{color:"#93a1ba",fontSize:9,interval:Math.max(0,Math.ceil(dates.length/5)-1)},axisLine:{lineStyle:{color:"#2a3550"}}}],
     yAxis:[{scale:true,axisLabel:{color:"#93a1ba",fontSize:10},splitLine:{lineStyle:{color:"#1d2638"}}},
-           {gridIndex:1,scale:true,axisLabel:{show:false},splitLine:{show:false}}],
+           {gridIndex:1,scale:true,axisLabel:{show:false},splitLine:{show:false}},
+           {gridIndex:2,scale:true,min:0,max:100,axisLabel:{color:"#93a1ba",fontSize:9},splitLine:{lineStyle:{color:"#1d2638"}}}],
     tooltip:{trigger:"axis"},
     series:[{type:"candlestick",data:arr.map(d=>[d.o,d.c,d.l,d.h]),itemStyle:{color:"#ef4444",color0:"#22c55e",borderColor:"#ef4444",borderColor0:"#22c55e"}},
-            {type:"bar",xAxisIndex:1,yAxisIndex:1,data:arr.map(d=>d.v),itemStyle:{color:"#3b82f6"}}]});
+            {type:"bar",xAxisIndex:1,yAxisIndex:1,data:arr.map(d=>d.v),itemStyle:{color:"#3b82f6"}},
+            kdjS?{type:"line",xAxisIndex:2,yAxisIndex:2,data:kdjS.K,showSymbol:false,lineStyle:{color:"#a78bfa",width:1.2},itemStyle:{color:"#a78bfa"},name:"K"}:{type:"line",xAxisIndex:2,yAxisIndex:2,data:[],showSymbol:false},
+            kdjS?{type:"line",xAxisIndex:2,yAxisIndex:2,data:kdjS.D,showSymbol:false,lineStyle:{color:"#f5a623",width:1.2},itemStyle:{color:"#f5a623"},name:"D"}:{type:"line",xAxisIndex:2,yAxisIndex:2,data:[],showSymbol:false},
+            kdjS?{type:"line",xAxisIndex:2,yAxisIndex:2,data:kdjS.J,showSymbol:false,lineStyle:{color:"#38bdf8",width:1},itemStyle:{color:"#38bdf8"},name:"J",
+              markLine:{symbol:"none",silent:true,data:[
+                {yAxis:80,lineStyle:{color:"rgba(239,68,68,.5)",type:"dashed"},label:{formatter:"超买80",color:"#ef4444",fontSize:9,position:"insideEndTop"}},
+                {yAxis:20,lineStyle:{color:"rgba(34,197,94,.5)",type:"dashed"},label:{formatter:"超卖20",color:"#22c55e",fontSize:9,position:"insideEndBottom"}}]}}:{type:"line",xAxisIndex:2,yAxisIndex:2,data:[],showSymbol:false}]});
   klineChart.resize();
 }
 /* ===== 分时量价 + 盘中形态判定（拉升/洗盘/吸筹/出货）===== */
@@ -786,11 +825,23 @@ function renderChip(j){
 }
 function renderFund(j){
   const t=getTech(j); const m=j.capital?j.capital.mainNetInflow:null;
+  const kdj=getKdj(j,normKlines(j.klines||[]));
+  // KDJ 状态：超买=红（勿追高）、超卖=绿（关注反弹）、金叉偏多/死叉偏空
+  const kdjState=()=> !kdj ? '数据不足'
+    : kdj.zone==='overbought' ? '<span style="color:#ef4444">'+kdj.signal+'（超买，勿追高）</span>'
+    : kdj.zone==='oversold' ? '<span style="color:#22c55e">'+kdj.signal+'（超卖，关注反弹）</span>'
+    : kdj.signal;
   document.getElementById("fund").innerHTML=
     `<div class="it"><div class="k">主力净流入</div><div class="v ${m>=0?'up':'down'}">${m>=0?'+':''}${fmtCap(m)}</div></div>`+
     `<div class="it"><div class="k">MACD DIFF</div><div class="v ${t.diff>=0?'up':'down'}">${t.diff}</div></div>`+
     `<div class="it"><div class="k">MACD DEA</div><div class="v ${t.dea>=0?'up':'down'}">${t.dea}</div></div>`+
-    `<div class="it"><div class="k">MACD 状态</div><div class="v">${t.signal||t.zeroAxis||'—'}</div></div>`;
+    `<div class="it"><div class="k">MACD 状态</div><div class="v">${t.signal||t.zeroAxis||'—'}</div></div>`+
+    (kdj?
+    `<div class="it"><div class="k">KDJ K值</div><div class="v ${kdj.k>=80?'down':kdj.k<=20?'up':''}">${kdj.k}</div></div>`+
+    `<div class="it"><div class="k">KDJ D值</div><div class="v ${kdj.d>=80?'down':kdj.d<=20?'up':''}">${kdj.d}</div></div>`+
+    `<div class="it"><div class="k">KDJ J值</div><div class="v ${kdj.j>=100?'down':kdj.j<=0?'up':''}">${kdj.j}${kdj.jExtreme?' <span style="font-size:10px">('+kdj.jExtreme+')</span>':''}</div></div>`+
+    `<div class="it"><div class="k">KDJ 状态</div><div class="v" style="font-size:13px">${kdjState()}</div></div>`
+    :`<div class="it"><div class="k">KDJ</div><div class="v" style="font-size:13px;color:var(--sub)">数据不足</div></div>`);
 }
 function renderReview(){
   const j=state.data, m=state.model;
