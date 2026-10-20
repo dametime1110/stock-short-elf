@@ -731,7 +731,17 @@ function render(){
   try{ renderIntraday(j); }catch(e){ console.warn('分时渲染失败:',e); }
   try{ renderChip(j); }catch(e){ console.warn('筹码渲染失败:',e); }
   try{ renderFund(j); }catch(e){ console.warn('资金渲染失败:',e); }
-  try{ document.getElementById("news").innerHTML=(j.news||[]).map(n=>`<li>${n.title}<span class="d">${n.date||''}</span></li>`).join("")||'<li>暂无公告</li>'; }
+  try{
+    const newsList=j.news||[], newsBox=document.getElementById("news");
+    if(newsList.length){
+      newsBox.innerHTML=newsList.map(n=>`<li>${n.title}<span class="d">${n.date||''}</span></li>`).join("")
+        +(j.newsStale?'<li style="color:#fbbf24;font-size:12px">⚠️ 公告为限流前缓存，可能非最新</li>':'');
+    } else if(j.newsLimited){
+      newsBox.innerHTML='<li style="color:#fbbf24">⚠️ 公告获取限流中，稍后自动刷新（重大消息以交易所公告为准）</li>';
+    } else {
+      newsBox.innerHTML='<li>暂无公告</li>';
+    }
+  }
   catch(e){ console.warn('新闻渲染失败:',e); }
   try{ renderReview(); }catch(e){ console.warn('短评渲染失败:',e); }
 }

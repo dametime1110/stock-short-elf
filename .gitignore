@@ -1,0 +1,5 @@
+# 运行时缓存（云端沙箱自生成，不必入库）
+data/news_cache.json
+
+# 应用发布标记文件（WorkBuddy 内部产物）
+*.genie
