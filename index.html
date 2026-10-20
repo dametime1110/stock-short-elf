@@ -548,7 +548,7 @@ function renderKline(j){
   if(!kl.length){ document.getElementById("klineTip").textContent="K线数据暂不可用"; document.getElementById("klineTip").classList.remove("hidden"); return; }
   document.getElementById("klineTip").classList.add("hidden");
   if(!klineChart) klineChart=echarts.init(document.getElementById("kline"));
-  const arr=[...kl].reverse(); const dates=arr.map(d=>d.d.slice(5));
+  const arr=kl; const dates=arr.map(d=>d.d.slice(5));   // API 已保证旧→新正序，直接按时间从左到右画（2026-10-20 修：去掉多余的 reverse，原来左边最新右边最旧）
   klineChart.setOption({grid:[{left:52,right:14,top:14,height:"62%"},{left:52,right:14,top:"72%",height:"20%"}],
     xAxis:[{type:"category",data:dates,axisLabel:{color:"#93a1ba",fontSize:10},axisLine:{lineStyle:{color:"#2a3550"}}},
            {type:"category",data:dates,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:"#2a3550"}}}],
