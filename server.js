@@ -57,8 +57,9 @@ const server = http.createServer(async (req, res) => {
     const mode = u.searchParams.get('mode') || 'up';
     const limit = Math.min(parseInt(u.searchParams.get('limit') || '30', 10) || 30, 100);
     const force = u.searchParams.get('force') === '1';
+    const top = Math.min(parseInt(u.searchParams.get('top') || '300', 10) || 300, 1000);
     try {
-      const data = await getMarketView(mode, limit, force);
+      const data = await getMarketView(mode, limit, force, top);
       sendJSON(200, data);
     } catch (e) {
       sendJSON(502, { ok: false, msg: String(e.message || e) });

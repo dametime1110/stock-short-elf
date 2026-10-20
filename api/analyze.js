@@ -28,8 +28,9 @@ module.exports = async (req, res) => {
     const mode = url.searchParams.get('mode') || 'up';
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '30', 10) || 30, 100);
     const force = url.searchParams.get('force') === '1';
+    const top = Math.min(parseInt(url.searchParams.get('top') || '300', 10) || 300, 1000);
     try {
-      const data = await getMarketView(mode, limit, force);
+      const data = await getMarketView(mode, limit, force, top);
       return res.status(200).json(data);
     } catch (e) {
       return res.status(502).json({ ok: false, msg: String(e.message || e) });

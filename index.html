@@ -79,6 +79,18 @@
   .loading{padding:40px;text-align:center;color:var(--sub)}
   .err{padding:30px;text-align:center;color:#ff8a8a}
   .hidden{display:none}
+  /* 综合评分 */
+  .scorecard{display:flex;align-items:center;gap:16px;background:linear-gradient(120deg,#1b2942,#1d2638);border:1px solid #2c3a5a;border-radius:12px;padding:13px 15px;margin-bottom:14px}
+  .scorecard .num{font-size:34px;font-weight:800;line-height:1.1;min-width:60px;text-align:center}
+  .scorecard .g{font-size:14px;font-weight:700;text-align:center;margin-top:2px}
+  .scorecard .why{font-size:12px;color:var(--sub);line-height:1.7}
+  .scorecard .num.hi,.scorecard .g.hi{color:#ff8a8a}
+  .scorecard .num.mid,.scorecard .g.mid{color:#f5b85a}
+  .scorecard .num.lo,.scorecard .g.lo{color:#5be39a}
+  .sbadge{display:inline-block;min-width:36px;text-align:center;font-weight:800;font-size:13px;border-radius:8px;padding:3px 8px}
+  .sbadge.hi{background:rgba(239,68,68,.18);color:#ff8a8a}
+  .sbadge.mid{background:rgba(245,158,11,.15);color:#f5b85a}
+  .sbadge.lo{background:rgba(34,197,94,.15);color:#5be39a}
   /* 表格（自选/全市场） */
   table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
   table.tbl th{text-align:right;color:var(--sub);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
@@ -139,6 +151,7 @@
         <h3><span class="bar"></span>行情概览 <button class="addwatch" onclick="addWatch(state.code)">+ 加入自选</button></h3>
         <div class="ov" id="ov"></div>
       </div>
+      <div id="scoreCard"></div>
       <div class="card">
         <h3><span class="bar"></span>K线 / 成交量</h3>
         <div id="kline" class="chart"></div>
@@ -197,9 +210,11 @@
         <button class="on" data-mode="up" onclick="setMarketMode('up')">涨幅榜</button>
         <button data-mode="down" onclick="setMarketMode('down')">跌幅榜</button>
         <button data-mode="amp" onclick="setMarketMode('amp')">振幅榜</button>
+        <button data-mode="score" onclick="setMarketMode('score')">🏆 评分榜</button>
+        <button data-mode="score_deep" onclick="setMarketMode('score_deep')">🎯 综合榜</button>
       </div>
       <table class="tbl" id="mktTbl">
-        <thead><tr><th>名称 / 代码</th><th>现价</th><th>涨跌幅</th><th>振幅</th></tr></thead>
+        <thead id="mktHead"><tr><th>名称 / 代码</th><th>现价</th><th>涨跌幅</th><th>振幅</th></tr></thead>
         <tbody id="mktBody"></tbody>
       </table>
     </div>
@@ -454,10 +469,34 @@ function rowHTML(q,watch){
 }
 
 /* ===== 全市场 ===== */
+const MKT_HEADS={
+  up:   ['名称 / 代码','现价','涨跌幅','振幅'],
+  down: ['名称 / 代码','现价','涨跌幅','振幅'],
+  amp:  ['名称 / 代码','现价','涨跌幅','振幅'],
+  score:['名称 / 代码','评分','评级','涨跌幅','振幅'],
+  score_deep:['名称 / 代码','综合评分','今日分','短期分','涨跌幅']
+};
 function setMarketMode(mode){
   state.market.mode=mode;
   document.querySelectorAll('#mktBtns button').forEach(b=>b.classList.toggle('on', b.dataset.mode===mode));
+  document.getElementById("mktHead").innerHTML='<tr>'+MKT_HEADS[mode].map(h=>'<th>'+h+'</th>').join('')+'</tr>';
+  if(mode==='score_deep') document.getElementById("mktMeta").textContent='· 综合评分计算中（正在拉取候选股K线，约10-20秒，之后10分钟内缓存）…';
   refreshMarket();
+}
+function scoreBadge(score){
+  return `<span class="sbadge ${scoreCls(score)}">${score}</span>`;
+}
+function rowScoreHTML(q,rank){
+  const cls=q.changePct>=0?'up':'down', sign=q.changePct>=0?'+':'';
+  const deep=q.shortScore!=null;
+  return `<tr onclick="load('${q.code}')">
+    <td>${q.name}<div class="code">${q.code}</div></td>
+    <td>${scoreBadge(q.score)}</td>
+    <td>${q.grade||'—'}</td>
+    ${deep?`<td style="color:var(--sub)">${q.quoteScore??'-'}</td><td style="color:var(--sub)">${q.shortScore??'-'}</td>`:''}
+    <td class="${cls}">${sign}${q.changePct??'-'}%</td>
+    <td>${q.amp??'-'}%</td>
+  </tr>`;
 }
 async function refreshMarket(){
   if(state.market.loading) return;
@@ -472,9 +511,13 @@ async function refreshMarket(){
       document.getElementById("bard").innerHTML=`<span class="u" style="width:${upPct}%"></span><span class="d" style="width:${100-upPct}%"></span>`;
       document.getElementById("breadthTxt").innerHTML=`上涨 <b class="up">${b.up}</b> · 下跌 <b class="down">${b.down}</b> · 涨停 ${b.limitUp} · 跌停 ${b.limitDown} · 平 ${b.flat}`;
     }
-    document.getElementById("mktMeta").textContent='· 覆盖 '+j.count+'/'+j.total+' · 源 '+(j.source||'-')+' · '+ new Date(state.market.updatedAt).toLocaleTimeString();
-    document.getElementById("mktBody").innerHTML = state.market.list.map(q=>rowHTML(q,false)).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--sub)">无数据</td></tr>';
-  }catch(e){ document.getElementById("mktBody").innerHTML='<tr><td colspan="4" style="text-align:center;color:#ff8a8a">刷新失败：'+e.message+'</td></tr>'; }
+    const modeTag=state.market.mode==='score'?' · 实时评分（今日走势）':state.market.mode==='score_deep'?' · 综合评分（今日走势55%+短期K线45%，前300名候选深度计算）':'';
+    document.getElementById("mktMeta").textContent='· 覆盖 '+j.count+'/'+j.total+' · 源 '+(j.source||'-')+' · '+ new Date(state.market.updatedAt).toLocaleTimeString()+modeTag;
+    const isScore=state.market.mode==='score'||state.market.mode==='score_deep';
+    document.getElementById("mktBody").innerHTML = isScore
+      ? (state.market.list.map((q,i)=>rowScoreHTML(q,i)).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--sub)">无数据</td></tr>')
+      : (state.market.list.map(q=>rowHTML(q,false)).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--sub)">无数据</td></tr>');
+  }catch(e){ document.getElementById("mktBody").innerHTML='<tr><td colspan="5" style="text-align:center;color:#ff8a8a">刷新失败（已自动重试3次）：'+escHtml(friendlyErr(e)).slice(0,120)+'</td></tr>'; }
   state.market.loading=false;
 }
 
@@ -522,6 +565,27 @@ function buildChips(){
     el.className="chip"+(s.code===state.code?" on":""); el.textContent=s.name;
     el.onclick=()=>load(s.code); box.appendChild(el); });
 }
+/* ===== 综合评分卡（个股页） ===== */
+function scoreCls(s){ return s>=65?'hi':s>=45?'mid':'lo'; }
+function scoreNote(d){
+  const p=v=>(v>0?'+':'')+v;
+  const items=[['技术',d.tech],['资金',d.fund],['筹码',d.chip],['动量',d.mom],['今日走势',d.today],['RSI',d.rsi]];
+  if(d.vol) items.push(['波动',d.vol]);
+  return items.map(([k,v])=>`${k} <b style="color:${v>0?'#ff8a8a':v<0?'#5be39a':'#93a1ba'}">${p(v||0)}</b>`).join(' · ');
+}
+function renderScore(j){
+  const box=document.getElementById("scoreCard");
+  if(j.score==null){ box.innerHTML=''; return; }
+  const cls=scoreCls(j.score);
+  box.innerHTML=`<div class="scorecard">
+    <div><div class="num ${cls}">${j.score}</div><div class="g ${cls}">${j.grade||'—'}</div></div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13.5px;font-weight:700;margin-bottom:2px">综合评分 <span style="font-size:11px;color:var(--sub);font-weight:400">（技术 · 资金 · 筹码 · 动量 · 今日走势 加权，0-100）</span></div>
+      <div class="why">${scoreNote(j.scoreDims||{})}</div>
+    </div>
+  </div>`;
+}
+
 function render(){
   const j=state.data;
   document.getElementById("loading").classList.add("hidden");
@@ -535,6 +599,7 @@ function render(){
     (sn.pe?`<div class="it"><div class="k">PE(TTM)</div><div class="v">${sn.pe}</div></div>`:'')+
     (sn.pb?`<div class="it"><div class="k">PB</div><div class="v">${sn.pb}</div></div>`:'')+
     `<div class="it"><div class="k">总市值</div><div class="v" style="font-size:15px">${fmtMkt(sn.totalMktCap)}</div></div>`;
+  try{ renderScore(j); }catch(e){ console.warn('评分渲染失败:',e); }
   // 分区容错：任一区块渲染失败只影响该区块，不再让整页停在旧数据（2026-10-20）
   try{ renderKline(j); }catch(e){ console.warn('K线渲染失败:',e); }
   try{ renderChip(j); }catch(e){ console.warn('筹码渲染失败:',e); }
