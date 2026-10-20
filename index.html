@@ -575,13 +575,16 @@ function scoreNote(d){
 }
 function renderScore(j){
   const box=document.getElementById("scoreCard");
-  if(j.score==null){ box.innerHTML=''; return; }
-  const cls=scoreCls(j.score);
+  // 评分在顶层（向后兼容）或 heuristic 内（当前 analyze 结构）
+  const h=j.heuristic||{};
+  const score=j.score!=null?j.score:h.score, grade=j.grade||h.grade, dims=j.scoreDims||h.scoreDims;
+  if(score==null){ box.innerHTML=''; return; }
+  const cls=scoreCls(score);
   box.innerHTML=`<div class="scorecard">
-    <div><div class="num ${cls}">${j.score}</div><div class="g ${cls}">${j.grade||'—'}</div></div>
+    <div><div class="num ${cls}">${score}</div><div class="g ${cls}">${grade||'—'}</div></div>
     <div style="flex:1;min-width:0">
       <div style="font-size:13.5px;font-weight:700;margin-bottom:2px">综合评分 <span style="font-size:11px;color:var(--sub);font-weight:400">（技术 · 资金 · 筹码 · 动量 · 今日走势 加权，0-100）</span></div>
-      <div class="why">${scoreNote(j.scoreDims||{})}</div>
+      <div class="why">${scoreNote(dims||{})}</div>
     </div>
   </div>`;
 }
