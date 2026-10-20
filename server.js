@@ -4,7 +4,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { analyze, search, getLiveQuotes, getMarketView, refreshStockList, startHotFlowRefresh } = require('./lib/analyzer');
+const { analyze, search, getLiveQuotes, getMarketView, refreshStockList, startHotFlowRefresh, getIntraday, getFlow, resolveSecid } = require('./lib/analyzer');
 
 const PORT = process.env.PORT || 3000;
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
@@ -67,6 +67,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (u.pathname === '/api/health') {
+    try {
+      const probe = await healthProbe();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ ok: true, ...probe }));
+    } catch (e) {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ ok: false, msg: String(e.message || e), uptime: Math.round(process.uptime()) }));
+    }
+    return;
+  }
+
   // 静态前端（no-store：修复后用户刷新必须立刻拿到新版，避免旧版 JS 缓存导致"搜索不切换"）
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store, must-revalidate', 'Pragma': 'no-cache' });
@@ -78,6 +90,29 @@ server.listen(PORT, '0.0.0.0', () => {
   // 资金流预热刷新：盘中每5分钟后台重试最近访问过的股票（东财接口间歇限流，抓住放行窗口写入当日缓存）
   startHotFlowRefresh();
 });
+
+/* ===== /api/health 自诊断（供外部看门狗巡检）=====
+   轻量探测三大数据源可达性 + 进程存活，供自动化巡检判断是否"硬故障"。 */
+async function healthProbe() {
+  const uptime = Math.round(process.uptime());
+  const start = Date.now();
+  const out = { uptime, ts: new Date().toISOString(), rss: process.memoryUsage().rss };
+  try {
+    const { source } = await getLiveQuotes(['600519']);
+    out.quote = source; // tencent | sina | none
+  } catch (e) { out.quote = 'err'; }
+  try {
+    const it = await getIntraday('1.600519');
+    out.intraday = it ? it.source : 'none';
+    out.intradayPts = it ? it.points.length : 0;
+  } catch (e) { out.intraday = 'err'; }
+  try {
+    const fl = await getFlow('1.600519');
+    out.flow = (fl && fl.mainNetInflow != null) ? 'ok' : 'limited'; // 东财间歇限流→limited 非硬故障
+  } catch (e) { out.flow = 'err'; }
+  out.probeMs = Date.now() - start;
+  return out;
+}
 
 /* ===== 进程级"内置看门狗"（2026-10-20 加）=====
    无状态 HTTP 服务，任何逃逸的未捕获异常（定时器回调/流事件/异步链外抛错）
