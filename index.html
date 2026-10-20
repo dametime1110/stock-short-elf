@@ -115,6 +115,19 @@
   .acc-signals{display:flex;flex-wrap:wrap;gap:5px}
   .sig{font-size:10.5px;padding:2px 7px;border-radius:5px;background:rgba(100,116,139,.10);color:#7d8aa0;border:1px solid rgba(100,116,139,.22);cursor:help}
   .sig.hit{background:rgba(59,130,246,.13);color:#7db3ff;border-color:rgba(59,130,246,.38)}
+  /* 分时形态判定卡 */
+  .intra-block{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:7px}
+  .intra-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .intra-pattern{font-size:12.5px;font-weight:800;padding:4px 12px;border-radius:20px;white-space:nowrap}
+  .intra-pattern.ip-rally{background:rgba(239,68,68,.16);color:#ff8a8a;border:1px solid rgba(239,68,68,.45)}
+  .intra-pattern.ip-washout{background:rgba(245,158,11,.14);color:#f5b85a;border:1px solid rgba(245,158,11,.4)}
+  .intra-pattern.ip-accumulation{background:rgba(59,130,246,.14);color:#7db3ff;border:1px solid rgba(59,130,246,.4)}
+  .intra-pattern.ip-distribution{background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.4)}
+  .intra-pattern.ip-neutral{background:rgba(100,116,139,.14);color:#94a3b8;border:1px solid rgba(100,116,139,.35)}
+  .intra-num{font-size:11.5px;color:var(--sub)}
+  .intra-num b{color:var(--brand);font-size:14px}
+  .intra-metrics{font-size:11px;color:var(--sub);line-height:1.6}
+  .intra-hint{font-size:12px;color:#c8d2e0;background:rgba(100,116,139,.08);border:1px solid rgba(100,116,139,.2);border-radius:8px;padding:7px 10px;line-height:1.55}
   /* 表格（自选/全市场） */
   table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
   table.tbl th{text-align:right;color:var(--sub);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
@@ -180,6 +193,12 @@
         <h3><span class="bar"></span>K线 / 成交量</h3>
         <div id="kline" class="chart"></div>
         <div id="klineTip" class="hidden" style="text-align:center;color:#93a1ba;padding:30px 10px;font-size:13px"></div>
+      </div>
+      <div class="card">
+        <h3><span class="bar"></span>分时量价 · 盘中形态判定 <span class="muted" style="font-size:11px;font-weight:400">拉升 / 洗盘 / 吸筹 / 出货</span></h3>
+        <div id="intraday" class="chart" style="height:300px"></div>
+        <div id="intradayTip" class="hidden" style="text-align:center;color:#93a1ba;padding:30px 10px;font-size:13px"></div>
+        <div id="intradayVerdict"></div>
       </div>
       <div class="card">
         <h3><span class="bar"></span>筹码峰（由K线+成交量自算 CYQ）</h3>
@@ -668,6 +687,7 @@ function render(){
   try{ renderScore(j); }catch(e){ console.warn('评分渲染失败:',e); }
   // 分区容错：任一区块渲染失败只影响该区块，不再让整页停在旧数据（2026-10-20）
   try{ renderKline(j); }catch(e){ console.warn('K线渲染失败:',e); }
+  try{ renderIntraday(j); }catch(e){ console.warn('分时渲染失败:',e); }
   try{ renderChip(j); }catch(e){ console.warn('筹码渲染失败:',e); }
   try{ renderFund(j); }catch(e){ console.warn('资金渲染失败:',e); }
   try{ document.getElementById("news").innerHTML=(j.news||[]).map(n=>`<li>${n.title}<span class="d">${n.date||''}</span></li>`).join("")||'<li>暂无公告</li>'; }
@@ -689,6 +709,57 @@ function renderKline(j){
     series:[{type:"candlestick",data:arr.map(d=>[d.o,d.c,d.l,d.h]),itemStyle:{color:"#ef4444",color0:"#22c55e",borderColor:"#ef4444",borderColor0:"#22c55e"}},
             {type:"bar",xAxisIndex:1,yAxisIndex:1,data:arr.map(d=>d.v),itemStyle:{color:"#3b82f6"}}]});
   klineChart.resize();
+}
+/* ===== 分时量价 + 盘中形态判定（拉升/洗盘/吸筹/出货）===== */
+let intradayChart;
+function renderIntraday(j){
+  const it=j.intraday, tip=document.getElementById("intradayTip"), vd=document.getElementById("intradayVerdict");
+  if(!it || !Array.isArray(it.points) || it.points.length<10){
+    if(intradayChart){ try{ intradayChart.clear(); }catch(e){} }
+    tip.textContent="分时数据暂不可用（休市或数据源波动，不影响其他数据）"; tip.classList.remove("hidden");
+    vd.innerHTML=''; return;
+  }
+  tip.classList.add("hidden");
+  if(!intradayChart) intradayChart=echarts.init(document.getElementById("intraday"));
+  const pts=it.points.map(p=>({m:p[0],p:p[1],avg:p[2],v:p[3]}));
+  const times=pts.map(x=>String(Math.floor(x.m/60)).padStart(2,'0')+':'+String(x.m%60).padStart(2,'0'));
+  const prev=it.prevClose||pts[0].p;
+  const up=(it.metrics&&it.metrics.chgPct>=0);
+  const lineColor=up?'#ef4444':'#22c55e';
+  const volColors=pts.map((x,i)=> i>0 && x.p>=pts[i-1].p ? '#ef4444':'#22c55e');
+  intradayChart.setOption({
+    grid:[{left:52,right:14,top:16,height:"58%"},{left:52,right:14,top:"70%",height:"20%"}],
+    xAxis:[{type:"category",data:times,axisLabel:{color:"#93a1ba",fontSize:10,interval:(i)=> i%30===0},axisLine:{lineStyle:{color:"#2a3550"}}},
+           {type:"category",data:times,gridIndex:1,axisLabel:{show:false},axisLine:{lineStyle:{color:"#2a3550"}}}],
+    yAxis:[{scale:true,axisLabel:{color:"#93a1ba",fontSize:10},splitLine:{lineStyle:{color:"#1d2638"}}},
+           {gridIndex:1,scale:true,axisLabel:{show:false},splitLine:{show:false}}],
+    tooltip:{trigger:"axis",formatter:ps=>{
+      const i=ps[0].dataIndex, x=pts[i];
+      return `${times[i]}<br>价格 <b style="color:${lineColor}">${x.p}</b><br>均价 <b style="color:#f5a623">${x.avg.toFixed(2)}</b><br>分钟量 ${x.v}`;
+    }},
+    series:[
+      {type:"line",data:pts.map(x=>x.p),showSymbol:false,smooth:false,lineStyle:{color:lineColor,width:1.6},itemStyle:{color:lineColor},
+       markLine:{symbol:"none",silent:true,data:[{yAxis:prev,lineStyle:{color:"#94a3b8",type:"dashed"},label:{formatter:"昨收 "+prev,color:"#94a3b8",position:"insideStartTop"}}]}},
+      {type:"line",data:pts.map(x=>+x.avg.toFixed(3)),showSymbol:false,lineStyle:{color:"#f5a623",width:1.2},itemStyle:{color:"#f5a623"}},
+      {type:"bar",xAxisIndex:1,yAxisIndex:1,data:pts.map(x=>x.v),itemStyle:{color:(p)=>volColors[p.dataIndex]||"#3b82f6"}}
+    ]});
+  intradayChart.resize();
+  // —— 形态判定卡 ——
+  const m=it.metrics||{};
+  const LABEL={rally:'🚀 拉升',washout:'🧹 洗盘',accumulation:'🕵️ 吸筹',distribution:'⚠️ 出货',neutral:'😑 方向不明'};
+  const hits=(it.evidence||[]).filter(e=>e.hit);
+  const src=it.source==='eastmoney'?'东财':'腾讯';
+  vd.innerHTML=`<div class="intra-block">
+    <div class="intra-row">
+      <span class="intra-pattern ip-${it.pattern}">${it.icon} ${LABEL[it.pattern]||it.label}</span>
+      <span class="intra-num">形态强度 <b>${it.score}</b>/100</span>
+      <span class="intra-num">${it.date||''} · ${src}源 · ${pts.length}分钟</span>
+    </div>
+    <div class="intra-metrics">站上均价 <b>${Math.round((m.aboveRatio||0)*100)}%</b> · 现价乖离 <b>${m.biasNow>0?'+':''}${m.biasNow}%</b> · 均价线日内${m.vwapSlope>=0?'抬升':'下行'} ${m.vwapSlope}% · 跌破均价 ${m.dips} 次 · 跌时放量率 ${m.downVolRatio} · 涨时放量率 ${m.upVolRatio} · 尾盘半小时 ${m.late30>0?'+':''}${m.late30}%${m.volRatioDay!=null?' · 当日量为近期日均 '+m.volRatioDay+' 倍':''}</div>
+    ${(it.evidence||[]).length?`<div class="acc-signals">${(it.evidence||[]).map(e=>`<span class="sig ${e.hit?'hit':''}" title="${escHtml(e.d||'')}">${e.hit?'✓':'✗'} ${escHtml(e.t)}</span>`).join('')}</div>`:''}
+    <div class="intra-hint">💡 ${escHtml(it.hint||'')}</div>
+    ${hits.length?`<div class="intra-metrics" style="font-size:10.5px">判定依据：${hits.map(e=>escHtml(e.t)).join(' + ')}（命中${hits.length}条定型；规则透明，悬停特征看数值）</div>`:''}
+  </div>`;
 }
 function renderChip(j){
   let c=(j.cyq && Array.isArray(j.cyq.points) && j.cyq.points.length) ? j.cyq : null;
@@ -759,7 +830,7 @@ setInterval(()=>{
   else if(state.data) refreshDetailPrice();
   updateStatus();
 },30000);
-window.addEventListener("resize",()=>{if(klineChart)klineChart.resize();if(chipChart)chipChart.resize();});
+window.addEventListener("resize",()=>{if(klineChart)klineChart.resize();if(chipChart)chipChart.resize();if(intradayChart)intradayChart.resize();});
 </script>
 </body>
 </html>
