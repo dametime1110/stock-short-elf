@@ -594,7 +594,8 @@ function renderScore(j){
   const daily=j.dailyScores||[];
   const balls=daily.map(d=>{
     const raw=String(d.date||'');
-    const dt=d.isToday?'今天':(raw.length===8?raw.slice(4,6)+'-'+raw.slice(6,8):(raw||'—'));
+    const m=raw.match(/^20(\d{2})-?(\d{2})-?(\d{2})$/);   // 兼容 20261014 与 2026-10-14
+    const dt=d.isToday?'今天':(m?m[2]+'-'+m[3]:(raw||'—'));
     return `<div class="dscore${d.isToday?' today':''}"><span class="d">${dt}</span><span class="ball ${scoreCls(d.score)}">${d.score}</span></div>`;
   }).join('');
   box.innerHTML=`<div class="scorecard">
