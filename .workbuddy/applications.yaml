@@ -1,3 +1,5 @@
 applications:
   - name: 股票短线精灵
     locator: wbapp_1PpoaHi1pRsJskYnsgIJRr
+  - name: A股韭菜指数看板
+    locator: wbapp_GdSgRZSIyhEtEwHUJ4r8Bd
