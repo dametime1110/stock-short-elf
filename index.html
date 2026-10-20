@@ -101,6 +101,20 @@
   .dscore .ball.lo{background:rgba(34,197,94,.15);color:#5be39a;border:1px solid rgba(34,197,94,.4)}
   .dscore.today .d{color:var(--brand);font-weight:700}
   .dscore.today .ball{width:42px;height:42px;font-size:16px;box-shadow:0 0 0 2px rgba(59,130,246,.35)}
+  /* 主力吸筹识别区块（2026-10-20）*/
+  .acc-block{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:7px}
+  .acc-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .acc-phase{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+  .acc-phase.acc-accumulating{background:rgba(245,158,11,.16);color:#f5b85a;border:1px solid rgba(245,158,11,.45)}
+  .acc-phase.acc-quiet{background:rgba(100,116,139,.14);color:#94a3b8;border:1px solid rgba(100,116,139,.35)}
+  .acc-phase.acc-launched{background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.4)}
+  .acc-phase.acc-topping{background:rgba(239,68,68,.14);color:#ff8a8a;border:1px solid rgba(239,68,68,.4)}
+  .acc-num{font-size:11.5px;color:var(--sub)}
+  .acc-num b{color:var(--brand);font-size:14px}
+  .acc-tip{font-size:10.5px;color:var(--sub)}
+  .acc-signals{display:flex;flex-wrap:wrap;gap:5px}
+  .sig{font-size:10.5px;padding:2px 7px;border-radius:5px;background:rgba(100,116,139,.10);color:#7d8aa0;border:1px solid rgba(100,116,139,.22);cursor:help}
+  .sig.hit{background:rgba(59,130,246,.13);color:#7db3ff;border-color:rgba(59,130,246,.38)}
   /* 表格（自选/全市场） */
   table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
   table.tbl th{text-align:right;color:var(--sub);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
@@ -222,6 +236,7 @@
         <button data-mode="amp" onclick="setMarketMode('amp')">振幅榜</button>
         <button data-mode="score" onclick="setMarketMode('score')">🏆 评分榜</button>
         <button data-mode="score_deep" onclick="setMarketMode('score_deep')">🎯 综合榜</button>
+        <button data-mode="accumulation" onclick="setMarketMode('accumulation')">🕵️ 吸筹榜</button>
       </div>
       <table class="tbl" id="mktTbl">
         <thead id="mktHead"><tr><th>名称 / 代码</th><th>现价</th><th>涨跌幅</th><th>振幅</th></tr></thead>
@@ -484,13 +499,15 @@ const MKT_HEADS={
   down: ['名称 / 代码','现价','涨跌幅','振幅'],
   amp:  ['名称 / 代码','现价','涨跌幅','振幅'],
   score:['名称 / 代码','评分','评级','涨跌幅','振幅'],
-  score_deep:['名称 / 代码','综合评分','今日分','短期分','涨跌幅']
+  score_deep:['名称 / 代码','综合评分','今日分','短期分','涨跌幅'],
+  accumulation:['名称 / 代码','吸筹分','强度','位置','今日涨跌','换手']
 };
 function setMarketMode(mode){
   state.market.mode=mode;
   document.querySelectorAll('#mktBtns button').forEach(b=>b.classList.toggle('on', b.dataset.mode===mode));
   document.getElementById("mktHead").innerHTML='<tr>'+MKT_HEADS[mode].map(h=>'<th>'+h+'</th>').join('')+'</tr>';
   if(mode==='score_deep') document.getElementById("mktMeta").textContent='· 综合评分计算中（正在拉取候选股K线，约10-20秒，之后10分钟内缓存）…';
+  else if(mode==='accumulation') document.getElementById("mktMeta").textContent='· 吸筹识别计算中（全市场预筛150只+拉K线识别，约10-20秒，之后10分钟内缓存）…';
   refreshMarket();
 }
 function scoreBadge(score){
@@ -508,6 +525,18 @@ function rowScoreHTML(q,rank){
     <td>${q.amp??'-'}%</td>
   </tr>`;
 }
+// 吸筹榜行：吸筹分 + 强度 + 60日区间位置 + 今日涨跌 + 换手
+function rowAccHTML(q){
+  const cls=q.changePct>=0?'up':'down', sign=q.changePct>=0?'+':'';
+  return `<tr onclick="load('${q.code}')">
+    <td>${q.name}<div class="code">${q.code}</div></td>
+    <td>${scoreBadge(q.accScore)}</td>
+    <td>${q.accGrade||'—'}${q.accHits?`<div class="code" style="font-size:10px;max-width:150px;white-space:normal">${escHtml(q.accHits)}</div>`:''}</td>
+    <td>${q.pos!=null?Math.round(q.pos*100)+'%':'—'}</td>
+    <td class="${cls}">${sign}${q.changePct??'-'}%</td>
+    <td>${q.turnover??'-'}%</td>
+  </tr>`;
+}
 async function refreshMarket(){
   if(state.market.loading) return;
   state.market.loading=true;
@@ -521,10 +550,13 @@ async function refreshMarket(){
       document.getElementById("bard").innerHTML=`<span class="u" style="width:${upPct}%"></span><span class="d" style="width:${100-upPct}%"></span>`;
       document.getElementById("breadthTxt").innerHTML=`上涨 <b class="up">${b.up}</b> · 下跌 <b class="down">${b.down}</b> · 涨停 ${b.limitUp} · 跌停 ${b.limitDown} · 平 ${b.flat}`;
     }
-    const modeTag=state.market.mode==='score'?' · 实时评分（今日走势）':state.market.mode==='score_deep'?' · 综合评分（今日走势55%+短期K线45%，前300名候选深度计算）':'';
+    const modeTag=state.market.mode==='score'?' · 实时评分（今日走势）':state.market.mode==='score_deep'?' · 综合评分（今日走势55%+短期K线45%，前300名候选深度计算）':state.market.mode==='accumulation'?' · 吸筹识别（涨停前潜伏：低位横盘+温和放量+资金持续流入，前150只候选深度计算）':'';
     document.getElementById("mktMeta").textContent='· 覆盖 '+j.count+'/'+j.total+' · 源 '+(j.source||'-')+' · '+ new Date(state.market.updatedAt).toLocaleTimeString()+modeTag;
     const isScore=state.market.mode==='score'||state.market.mode==='score_deep';
-    document.getElementById("mktBody").innerHTML = isScore
+    const isAcc=state.market.mode==='accumulation';
+    document.getElementById("mktBody").innerHTML = isAcc
+      ? (state.market.list.map(q=>rowAccHTML(q)).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--sub)">暂无符合条件的吸筹标的（可能处于普涨/普跌环境，或候选不足）</td></tr>')
+      : isScore
       ? (state.market.list.map((q,i)=>rowScoreHTML(q,i)).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--sub)">无数据</td></tr>')
       : (state.market.list.map(q=>rowHTML(q,false)).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--sub)">无数据</td></tr>');
   }catch(e){ document.getElementById("mktBody").innerHTML='<tr><td colspan="5" style="text-align:center;color:#ff8a8a">刷新失败（已自动重试3次）：'+escHtml(friendlyErr(e)).slice(0,120)+'</td></tr>'; }
@@ -579,7 +611,7 @@ function buildChips(){
 function scoreCls(s){ return s>=65?'hi':s>=45?'mid':'lo'; }
 function scoreNote(d){
   const p=v=>(v>0?'+':'')+v;
-  const items=[['技术',d.tech],['资金',d.fund],['筹码',d.chip],['动量',d.mom],['今日走势',d.today],['RSI',d.rsi]];
+  const items=[['技术',d.tech],['资金',d.fund],['吸筹',d.acc],['筹码',d.chip],['动量',d.mom],['今日走势',d.today],['RSI',d.rsi]];
   if(d.vol) items.push(['波动',d.vol]);
   return items.map(([k,v])=>`${k} <b style="color:${v>0?'#ff8a8a':v<0?'#5be39a':'#93a1ba'}">${p(v||0)}</b>`).join(' · ');
 }
@@ -598,12 +630,24 @@ function renderScore(j){
     const dt=d.isToday?'今天':(m?m[2]+'-'+m[3]:(raw||'—'));
     return `<div class="dscore${d.isToday?' today':''}"><span class="d">${dt}</span><span class="ball ${scoreCls(d.score)}">${d.score}</span></div>`;
   }).join('');
+  // 主力吸筹识别（涨停前潜伏信号）
+  const acc=j.accumulation||h.accumulation;
+  const ACC_LABEL={accumulating:'🕵️ 主力吸筹中',quiet:'😴 缩量观察',launched:'🚀 已启动',topping:'⚠️ 高位派发风险'};
+  const accHtml=(acc&&acc.phase&&acc.phase!=='none')?`<div class="acc-block">
+    <div class="acc-row">
+      <span class="acc-phase acc-${acc.phase}">${ACC_LABEL[acc.phase]}</span>
+      <span class="acc-num">吸筹分 <b>${acc.accScore}</b>/100</span>
+      <span class="acc-tip">低位 · 横盘 · 温和放量 · 吸筹K线 · 资金持续流入 · 波动收敛 · 均线粘合</span>
+    </div>
+    <div class="acc-signals">${(acc.signals||[]).map(s=>`<span class="sig ${s.hit?'hit':''}" title="${escHtml(s.d||'')}">${s.hit?'✓':'✗'} ${escHtml(s.t)}</span>`).join('')}</div>
+  </div>`:'';
   box.innerHTML=`<div class="scorecard">
     <div><div class="num ${cls}">${score}</div><div class="g ${cls}">${grade||'—'}</div></div>
     <div style="flex:1;min-width:0">
-      <div style="font-size:13.5px;font-weight:700;margin-bottom:2px">综合评分 <span style="font-size:11px;color:var(--sub);font-weight:400">（技术 · 资金 · 筹码 · 动量 · 今日走势 加权，0-100）</span></div>
+      <div style="font-size:13.5px;font-weight:700;margin-bottom:2px">综合评分 <span style="font-size:11px;color:var(--sub);font-weight:400">（技术 · 资金 · 筹码 · 动量 · 今日走势 · 吸筹 加权，0-100）</span></div>
       <div class="why">${scoreNote(dims||{})}</div>
       ${balls?`<div class="dscore-row">${balls}</div>`:''}
+      ${accHtml}
     </div>
   </div>`;
 }
