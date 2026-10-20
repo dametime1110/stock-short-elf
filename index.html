@@ -339,8 +339,59 @@ function friendlyErr(e){
 }
 
 let state={ tab:'stock', model:'hy3', code:'600519', data:null, nextRefreshAt:Date.now()+30000, loading:false,
-  watch: loadWatch(), market:{mode:'up',list:[],breadth:null,updatedAt:0,loading:false} };
+  watch: loadWatch(), market:{mode:'up',list:[],breadth:null,updatedAt:0,loading:false}, frontNews:null };
 let klineChart,chipChart;
+
+/* ===== 公告（重大消息）抓取 =====
+   后端从云端服务器抓东财搜索接口，但东财已对云端服务器 IP 限流（返回静默空结果），
+   而用户本机/手机浏览器 IP 不受限。故公告改为「浏览器端 JSONP 直连东财」，
+   彻底绕过云端 IP 限制；后端 j.news 仅作兜底（限流/失败时回退）。 */
+function fetchNewsJSONP(stockName){
+  return new Promise((resolve)=>{
+    const name=String(stockName||'').trim();
+    if(!name||/^\d+$/.test(name)) return resolve([]);
+    const cbName='__emNewsCb_'+Date.now()+'_'+Math.floor(Math.random()*1e4);
+    const param=encodeURIComponent(JSON.stringify({keyword:name,type:['cmsArticleWebOld'],pageindex:1,pagesize:6,searchtype:1}));
+    const t=setTimeout(()=>{ cleanup(); resolve([]); }, 9000);
+    function cleanup(){ clearTimeout(t); try{ if(s.parentNode) s.parentNode.removeChild(s); }catch(e){} try{ delete window[cbName]; }catch(e){} }
+    window[cbName]=function(j){
+      cleanup();
+      try{
+        const list=((j&&j.result&&j.result.cmsArticleWebOld)||[])
+          .map(x=>({title:String(x.title||'').replace(/<\/?em>/g,''),date:String(x.date||'').slice(0,10)}))
+          .filter(x=>x.title).slice(0,5);
+        const NEG=['立案','调查','处罚','警示','问询','退市','减持','诉讼','违规','预亏','下修','商誉','停牌','风险','ST'];
+        const w=n=>{ let s=0; const t=(n.title||''); for(const k of NEG) if(t.includes(k)) s+=100; return s; };
+        list.sort((a,b)=>w(b)-w(a));   // 立案/调查/处罚等利空置顶
+        resolve(list);
+      }catch(e){ resolve([]); }
+    };
+    const s=document.createElement('script');
+    s.src='https://search-api-web.eastmoney.com/search/jsonp?cb='+cbName+'&param='+param;
+    s.onerror=()=>{ cleanup(); resolve([]); };
+    document.head.appendChild(s);
+  });
+}
+function renderNewsBox(newsList, limited, stale){
+  const box=document.getElementById("news"); if(!box) return;
+  if(newsList&&newsList.length){
+    box.innerHTML=newsList.map(n=>`<li>${escHtml(n.title)}<span class="d">${n.date||''}</span></li>`).join("")
+      +(stale?'<li style="color:#fbbf24;font-size:12px">⚠️ 公告为限流前缓存，可能非最新</li>':'');
+  } else if(limited){
+    box.innerHTML='<li style="color:#fbbf24">⚠️ 公告获取限流中，稍后自动刷新（重大消息以交易所公告为准）</li>';
+  } else {
+    box.innerHTML='<li>暂无公告</li>';
+  }
+}
+function enrichNews(j){
+  if(!j||!j.name) return;
+  fetchNewsJSONP(j.name).then(list=>{
+    if(list&&list.length){
+      state.frontNews='近期公告/消息：'+list.slice(0,2).map(n=>n.title).join('；')+'。';
+      renderNewsBox(list,false,false); renderReview();
+    }
+  }).catch(()=>{});
+}
 
 function loadWatch(){ try{ return JSON.parse(localStorage.getItem('sse_watch')||'["600519","300750","002594","300059"]'); }catch(e){ return ["600519","300750","002594","300059"]; } }
 function saveWatch(){ localStorage.setItem('sse_watch', JSON.stringify(state.watch)); }
@@ -441,7 +492,7 @@ function switchTab(tab){
 
 /* ===== 个股加载 ===== */
 async function load(code){
-  state.code=code; state.tab='stock'; state.loading=true;
+  state.code=code; state.tab='stock'; state.loading=true; state.frontNews=null;
   switchTab('stock');
   hideSres();
   document.getElementById("loading").classList.remove("hidden");
@@ -451,9 +502,9 @@ async function load(code){
     const r=await fetchRetry(withShare('/api/analyze?code='+encodeURIComponent(code)));
     const j=await r.json();
     if(!j.ok) throw new Error(j.msg||'数据获取失败');
-    state.data=j; render();
+    state.data=j; render(); enrichNews(j);
   }catch(e){
-    if(FALLBACK_DATA[code]){ state.data={...FALLBACK_DATA[code],_fallback:true}; render(); }
+    if(FALLBACK_DATA[code]){ state.data={...FALLBACK_DATA[code],_fallback:true}; render(); enrichNews(state.data); }
     else { document.getElementById("loading").classList.add("hidden");
       const off = (typeof navigator!=='undefined' && navigator.onLine===false);
       document.getElementById("err").classList.remove("hidden");
@@ -731,17 +782,7 @@ function render(){
   try{ renderIntraday(j); }catch(e){ console.warn('分时渲染失败:',e); }
   try{ renderChip(j); }catch(e){ console.warn('筹码渲染失败:',e); }
   try{ renderFund(j); }catch(e){ console.warn('资金渲染失败:',e); }
-  try{
-    const newsList=j.news||[], newsBox=document.getElementById("news");
-    if(newsList.length){
-      newsBox.innerHTML=newsList.map(n=>`<li>${n.title}<span class="d">${n.date||''}</span></li>`).join("")
-        +(j.newsStale?'<li style="color:#fbbf24;font-size:12px">⚠️ 公告为限流前缓存，可能非最新</li>':'');
-    } else if(j.newsLimited){
-      newsBox.innerHTML='<li style="color:#fbbf24">⚠️ 公告获取限流中，稍后自动刷新（重大消息以交易所公告为准）</li>';
-    } else {
-      newsBox.innerHTML='<li>暂无公告</li>';
-    }
-  }
+  try{ renderNewsBox(j.news||[], j.newsLimited, j.newsStale); }
   catch(e){ console.warn('新闻渲染失败:',e); }
   try{ renderReview(); }catch(e){ console.warn('短评渲染失败:',e); }
 }
@@ -884,7 +925,8 @@ function renderReview(){
   if(!r){ tag.textContent=m+" 生成"; tag.className="tag"; document.getElementById("dims").innerHTML=''; document.getElementById("summary").textContent=''; document.getElementById("strategy").textContent=''; document.getElementById("forecast").innerHTML=''; return; }
   if(r.kind==='AI范例'){ tag.textContent="AI 范例短评"; tag.className="tag"; }
   else { tag.textContent="规则速评（接入AI升级）"; tag.className="tag rule"; }
-  const dims=[{t:"① 筹码峰",x:r.chip},{t:"② 资金面",x:r.fund},{t:"③ K线 / 技术",x:r.tech},{t:"④ 重大消息",x:r.news}];
+  const dims=[{t:"① 筹码峰",x:r.chip},{t:"② 资金面",x:r.fund},{t:"③ K线 / 技术",x:r.tech},
+    {t:"④ 重大消息",x:(state.frontNews?state.frontNews+'（浏览器端实时抓取）':r.news)}];
   document.getElementById("dims").innerHTML=dims.map(d=>`<div class="d"><div class="t">${d.t}</div><div class="x">${d.x}</div></div>`).join("");
   document.getElementById("summary").textContent="综合短评："+r.summary;
   document.getElementById("strategy").textContent=r.strategy;
