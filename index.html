@@ -822,7 +822,12 @@ function renderIntraday(j){
   }
   tip.classList.add("hidden");
   if(!intradayChart) intradayChart=echarts.init(document.getElementById("intraday"));
-  const pts=it.points.map(p=>({m:p[0],p:p[1],avg:p[2],v:p[3]}));
+  // 防御：过滤脏点（m 非法/为0、价格非法）、按分钟排序、去重同分钟（避免个别源脏数据导致只画部分或折线错乱）
+  let pts=it.points.map(p=>({m:p[0],p:p[1],avg:p[2],v:p[3]}))
+    .filter(x=>isFinite(x.m)&&x.m>0&&isFinite(x.p)&&isFinite(x.avg))
+    .sort((a,b)=>a.m-b.m);
+  const seen={}; const uniq=[]; for(const x of pts){ if(seen[x.m]) continue; seen[x.m]=1; uniq.push(x); } pts=uniq;
+  if(pts.length<10){ if(intradayChart){try{intradayChart.clear();}catch(e){}} tip.textContent="分时数据暂不可用（数据源限流或休市，稍后重试；K线/KDJ图可正常查看）"; tip.classList.remove("hidden"); vd.innerHTML=''; return; }
   const times=pts.map(x=>String(Math.floor(x.m/60)).padStart(2,'0')+':'+String(x.m%60).padStart(2,'0'));
   const prev=it.prevClose||pts[0].p;
   const up=(it.metrics&&it.metrics.chgPct>=0);
