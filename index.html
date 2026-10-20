@@ -605,7 +605,8 @@ function renderReview(){
   document.getElementById("forecast").innerHTML=
     `<div class="f b"><div class="h">基准情景</div>${fc.base||'—'}</div>`+
     `<div class="f u"><div class="h">乐观情景</div>${fc.bull||'—'}</div>`+
-    `<div class="f e"><div class="h">悲观情景</div>${fc.bear||'—'}</div>`;
+    `<div class="f e"><div class="h">悲观情景</div>${fc.bear||'—'}</div>`+
+    (r.probNote?`<div class="f" style="grid-column:1/-1;background:rgba(100,116,139,.10);border:1px solid rgba(100,116,139,.35)"><div class="h">概率怎么来的</div><span style="font-size:12px;color:#94a3b8">${r.probNote}</span></div>`:'');
 }
 function copyToAI(){
   const j=state.data; if(!j) return;
