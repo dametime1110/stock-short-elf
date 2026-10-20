@@ -91,6 +91,16 @@
   .sbadge.hi{background:rgba(239,68,68,.18);color:#ff8a8a}
   .sbadge.mid{background:rgba(245,158,11,.15);color:#f5b85a}
   .sbadge.lo{background:rgba(34,197,94,.15);color:#5be39a}
+  /* 近5日评分小球 */
+  .dscore-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:11px;padding-top:10px;border-top:1px dashed var(--line);align-items:flex-end}
+  .dscore{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .dscore .d{font-size:10.5px;color:var(--sub);white-space:nowrap}
+  .dscore .ball{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+  .dscore .ball.hi{background:rgba(239,68,68,.18);color:#ff8a8a;border:1px solid rgba(239,68,68,.45)}
+  .dscore .ball.mid{background:rgba(245,158,11,.15);color:#f5b85a;border:1px solid rgba(245,158,11,.4)}
+  .dscore .ball.lo{background:rgba(34,197,94,.15);color:#5be39a;border:1px solid rgba(34,197,94,.4)}
+  .dscore.today .d{color:var(--brand);font-weight:700}
+  .dscore.today .ball{width:42px;height:42px;font-size:16px;box-shadow:0 0 0 2px rgba(59,130,246,.35)}
   /* 表格（自选/全市场） */
   table.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
   table.tbl th{text-align:right;color:var(--sub);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px}
@@ -580,11 +590,19 @@ function renderScore(j){
   const score=j.score!=null?j.score:h.score, grade=j.grade||h.grade, dims=j.scoreDims||h.scoreDims;
   if(score==null){ box.innerHTML=''; return; }
   const cls=scoreCls(score);
+  // 近5个交易日评分小球（K线复算简化版；最后一个=今天，放大高亮）
+  const daily=j.dailyScores||[];
+  const balls=daily.map(d=>{
+    const raw=String(d.date||'');
+    const dt=d.isToday?'今天':(raw.length===8?raw.slice(4,6)+'-'+raw.slice(6,8):(raw||'—'));
+    return `<div class="dscore${d.isToday?' today':''}"><span class="d">${dt}</span><span class="ball ${scoreCls(d.score)}">${d.score}</span></div>`;
+  }).join('');
   box.innerHTML=`<div class="scorecard">
     <div><div class="num ${cls}">${score}</div><div class="g ${cls}">${grade||'—'}</div></div>
     <div style="flex:1;min-width:0">
       <div style="font-size:13.5px;font-weight:700;margin-bottom:2px">综合评分 <span style="font-size:11px;color:var(--sub);font-weight:400">（技术 · 资金 · 筹码 · 动量 · 今日走势 加权，0-100）</span></div>
       <div class="why">${scoreNote(dims||{})}</div>
+      ${balls?`<div class="dscore-row">${balls}</div>`:''}
     </div>
   </div>`;
 }
